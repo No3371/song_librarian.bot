@@ -1,0 +1,31 @@
+package main
+
+import (
+	"No3371.github.com/song_librarian.bot/logger"
+	flag "github.com/spf13/pflag"
+)
+
+type flags struct {
+	dev *bool
+	appid *int64
+	token *string
+	locale *string
+	delay *int
+}
+
+var globalFlags *flags
+
+func resolveFlags () {
+	if globalFlags == nil {
+		globalFlags = &flags{}
+	}
+	globalFlags.dev = flag.Bool("dev", false, "development mode")
+	globalFlags.appid = flag.Int64("appid", 0, "discord app id")
+	globalFlags.token = flag.String("token", "", "discord bot token")
+	globalFlags.locale = flag.String("locale", "TW", "locale code")
+	globalFlags.delay = flag.Int("delay", 5, "")
+
+	flag.Parse()
+	
+	logger.Logger.Infof("Flags resolved: %+v", globalFlags)
+}
