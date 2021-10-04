@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	// "fmt"
 	"log"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 	"No3371.github.com/song_librarian.bot/logger"
 	"No3371.github.com/song_librarian.bot/redirect"
 	"No3371.github.com/song_librarian.bot/storage"
+	"github.com/diamondburned/arikawa/v3/api"
 	"github.com/diamondburned/arikawa/v3/discord"
 	"github.com/diamondburned/arikawa/v3/gateway"
 	"github.com/diamondburned/arikawa/v3/state"
@@ -19,7 +21,6 @@ import (
 
 var pendingEmbeds chan *pendingEmbed
 var sv storage.StorageProvider
-var delay time.Duration
 
 type pendingEmbed struct {
 	cId discord.ChannelID
@@ -27,13 +28,13 @@ type pendingEmbed struct {
 	embedIndex int
 	bindingId int
 	pendedTime time.Time
+	guess redirect.RedirectType
 }
 
 
 func main() {
 	resolveFlags()
 	locale.SetLanguage(locale.FromString(*globalFlags.locale))
-	delay = time.Minute * time.Duration(*globalFlags.delay)
 	var err error
 
 	sv, err = storage.Sqlite()
@@ -61,6 +62,10 @@ func main() {
 			}
 			
 			passed := time.Now().Sub(nextPending.pendedTime)
+			delay := time.Duration(*globalFlags.delay) * time.Minute
+			if *globalFlags.dev {
+				delay = time.Second * 5
+			}
 			if (passed < delay) {
 				logger.Logger.Infof("Proceed in %s...", delay - passed)
 				t.Reset(delay - passed)
@@ -91,6 +96,18 @@ func main() {
 			}
 
 			var c_o, c_c, c_s, c_n int
+			switch nextPending.guess {
+			case redirect.Original:
+				c_o++
+				break
+			case redirect.Cover:
+				c_c++
+				break
+			case redirect.Stream:
+				c_s++
+				break
+			}
+
 			for _, r := range botMsg.Reactions {
 				switch r.Emoji.Name {
 				case reactionCover:
@@ -147,14 +164,77 @@ func main() {
 			}
 			logger.Logger.Infof("[REDIRECT] Redirecting to channel %d", destCId)
 
-			_, err = s.SendMessage(
-				discord.ChannelID(destCId),
-			 	fmt.Sprintf(locale.REDIRECT_FORMAT,	originalMsg.Author.Username, originalMsg.URL()),
-				originalMsg.Embeds[nextPending.embedIndex],
+			data := api.SendMessageData{
+				// Content: originalMsg.Embeds[nextPending.embedIndex].URL,
+				// Embeds: []discord.Embed {
+				// 	{
+				// 		Type: discord.LinkEmbed,
+				// 		Title: "Ref",
+				// 		URL: originalMsg.URL(),
+				// 		Fields: []discord.EmbedField {
+				// 			{
+				// 				Name: locale.SHARER,
+				// 				Value: originalMsg.Author.Username,
+				// 				Inline: true,
+				// 			},
+				// 			{
+				// 				Name: locale.SMSG,
+				// 				Value: originalMsg.URL(),
+				// 				Inline: true,
+				// 			},
+				// 		},
+				// 	},
+				// },
+				// Content:    fmt.Sprintf(locale.REDIRECT_FORMAT,	originalMsg.Author.Username, originalMsg.URL()),
+				Content:    "ｷﾀ━━ｷﾀ━━ｷﾀ──────────────=========≡≡≡≡≡Σ≡Σ(((つ•̀ㅂ•́)و✧",
+				Embeds:     []discord.Embed{
+					{
+						Type: discord.NormalEmbed,
+						Title: originalMsg.Embeds[nextPending.embedIndex].Title,
+						// Description: originalMsg.Embeds[nextPending.embedIndex].Description,
+						URL: originalMsg.Embeds[nextPending.embedIndex].URL,
+						// Timestamp: originalMsg.Embeds[nextPending.embedIndex].Timestamp,
+						// Footer: originalMsg.Embeds[nextPending.embedIndex].Footer,
+						Color: originalMsg.Embeds[nextPending.embedIndex].Color,
+						Provider: &discord.EmbedProvider{
+							Name: originalMsg.Embeds[nextPending.embedIndex].Provider.Name,
+							URL: originalMsg.Embeds[nextPending.embedIndex].Provider.URL,
+						},
+						Author: originalMsg.Embeds[nextPending.embedIndex].Author,
+						Fields: []discord.EmbedField {
+							{
+								Name: locale.SHARER,
+								Value: originalMsg.Author.Username,
+								Inline: true,
+							},
+							{
+								Name: locale.SMSG,
+								Value: originalMsg.URL(),
+								Inline: true,
+							},
+						},
+					},
+				},
+				// Reference: &discord.MessageReference{
+				// 	MessageID: originalMsg.ID,
+				// 	GuildID: originalMsg.GuildID,
+				// 	ChannelID: originalMsg.ChannelID,
+				// },
+			}
+			// s.SendMessageComplex(channelID discord.ChannelID, data api.SendMessageData) 
+
+			_, err := s.SendMessageComplex(
+				discord.ChannelID(destCId), data,
 			)
 
 			if err != nil {
-				logger.Logger.Errorf("Failed to redirect the embed: %s", err)
+				logger.Logger.Errorf("F1: %s", err)
+			}
+
+			_, err = s.SendMessage(discord.ChannelID(destCId), fmt.Sprintf("%s %s", originalMsg.Embeds[nextPending.embedIndex].URL, locale.EXPLAIN_EMBED_RESOLVE))
+
+			if err != nil {
+				logger.Logger.Errorf("F2: %s", err)
 			}
 
 			err = s.DeleteMessage(botMsg.ChannelID, botMsg.ID, "Temporary bot message")
@@ -175,7 +255,7 @@ func main() {
 	addHandlers(s)
 
 	if err := s.Open(context.Background()); err != nil {
-		logger.Logger.Errorf("[MAIN] %v", err)
+		logger.Logger.Fatalf("[MAIN] %v", err)
 	}
 	defer s.Close()
 

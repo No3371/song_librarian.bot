@@ -120,6 +120,7 @@ func (s *sqlite) SaveBinding(bId int, b interface {}) (err error) {
 	if err != nil {
 		return err
 	}
+	logger.Logger.Infof("[DB] Saving: %s", j)
 
 	query := fmt.Sprintf(
 	`
@@ -284,6 +285,7 @@ func (s *sqlite) LoadBinding (bId int, b interface{}) (err error) {
 		return err
 	}
 	rows.Close()
+	logger.Logger.Infof("[DB] Loaded: %s", j)
 
 	if len(j) == 0 {
 		return errors.New("scanned nothing")

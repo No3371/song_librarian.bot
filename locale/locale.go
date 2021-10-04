@@ -30,6 +30,11 @@ var ORIGINAL string
 var COVER    string
 var STREAM    string
 
+var SHARER string
+var SMSG string
+
+var EXPLAIN_EMBED_RESOLVE string
+
 func FromString (code string) Locale {
 	code = strings.ToLower(code)
 	switch code {
@@ -63,15 +68,18 @@ func SetLanguage (lang Locale) {
 		BUTTON_COVER = "翻唱"
 		DETECTED = "偵測到內嵌連結：%s\n根據標題猜測為 %s，%d 分鐘後自動轉發\n回應標記此影片的轉發分類：🇴 原創 / 🇨 翻唱 / 🇸 歌回 / ❌ 不轉發"
 		DETECTED_MATCH_NONE = "偵測到內嵌連結：%s\n標題不含任何關鍵字，預設不轉發\n%d 分鐘內回應標記此影片的轉發分類：🇴 原創 / 🇨 翻唱 / 🇸 歌回 / ❌ 不轉發"
-		DETECTED_UNKNOWN = "偵測到內嵌連結：%s\n猜測失敗。%d 分鐘內回應標記此影片的轉發分類：🇴 原創 / 🇨 翻唱 / 🇸 歌回 / ❌ 不轉發"
+		DETECTED_UNKNOWN = "偵測到內嵌連結：%s\n❌猜測失敗。%d 分鐘內回應標記此影片的轉發分類：🇴 原創 / 🇨 翻唱 / 🇸 歌回 / ❌ 不轉發"
 		FAILED_TO_GUESS = "[猜測失敗]"
 		REDIRECT_FORMAT = "分享者：%s\n原文：%s"
 		C_DESC = "設定分類頻道"
 		C_COVER_DESC = "翻唱歌曲頻道 ID"
 		C_ORIGINAL_DESC = "原創歌曲頻道 ID"
-		ORIGINAL = "原創"
-		COVER = "翻唱"
-		STREAM = "歌回"
+		ORIGINAL = "🇴 原創"
+		COVER = "🇨 翻唱"
+		STREAM = "🇸 歌回"
+		SHARER = "分享者"
+		SMSG = "原文"
+		EXPLAIN_EMBED_RESOLVE = "（內嵌播放）"
 		break
 	case EN:
 		HELLO = "*wake up*"
@@ -89,6 +97,9 @@ func SetLanguage (lang Locale) {
 		ORIGINAL = "Original"
 		COVER = "Cover"
 		STREAM = "Stream"
+		SHARER = "Sharer"
+		SMSG = "Origin"
+		EXPLAIN_EMBED_RESOLVE = "(Playable Embed)"
 		break
 	}
 }

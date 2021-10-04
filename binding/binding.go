@@ -158,6 +158,7 @@ func GetMappedBindingIDs (cId uint64) map[int]struct{} {
 			return nil
 		} else {
 			ids = bIds
+			mapping[cId] = ids
 			return ids
 		}
 	}
@@ -179,6 +180,7 @@ func QueryBinding (bId int) *ChannelBinding {
 				enabledUrlRegexes: loaded.EnabledUrlRegexes,
 				redirections: loaded.Redirections,
 			}
+			allBindings[bId] = b
 			return b
 		}
 	}

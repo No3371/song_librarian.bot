@@ -14,13 +14,41 @@ import (
 	"github.com/diamondburned/arikawa/v3/gateway"
 	"github.com/diamondburned/arikawa/v3/state"
 )
+type item struct {
+	c discord.ChannelID
+	m discord.MessageID
+}
+var fetchDelayTimer *time.Timer = time.NewTimer(time.Second * 5)
+var buffer chan item
+
+func init () {
+	buffer = make(chan item, 64)
+}
 
 func addHandlers (s *state.State) {
 	s.AddHandler(func (e *gateway.MessageCreateEvent) {
-		if err := onMessageCreated(s, &e.Message); err != nil {
-			logger.Logger.Errorf("[HANDLER] OnMessageCreated: %v", err)
+		if e.Author.Bot || len(e.Embeds) == 0 {
+			return
+		}
+
+		buffer<-item{
+			c: e.Message.ChannelID,
+			m: e.Message.ID,
 		}
 	})
+	go func () {
+		for {
+			it := <-buffer
+			m, err := s.Message(it.c, it.m)
+			if m == nil || err != nil {
+				continue
+			}
+			err = onMessageCreated(s, m)
+			if err != nil {
+				logger.Logger.Errorf("[HANDLER] OnMessageCreated: %v", err)
+			}
+		}
+	}()
 }
 
 func onMessageCreated (s *state.State, m *discord.Message) (err error) {
@@ -38,6 +66,10 @@ func onMessageCreated (s *state.State, m *discord.Message) (err error) {
 				continue
 			}
 
+			s.MessageStore.MessageSet(*m, true)
+			<-fetchDelayTimer.C
+			fetchDelayTimer.Reset(time.Second * 5)
+			
 			// Find all bindings bound
 			// For each binding, for each redirection, if the regex match...
 			for ei, e := range m.Embeds {
@@ -57,6 +89,9 @@ func onMessageCreated (s *state.State, m *discord.Message) (err error) {
 				}
 			}
 		}
+	} else {
+		logger.Logger.Infof("No mapped binding")
+
 	}
 
 	return nil
@@ -71,51 +106,50 @@ func pendEmbed (s *state.State, om *discord.Message, eIndex int, bId int) error 
 	rType, err := guess(embed)
 	switch rType {
 	case redirect.Original:
-		sendMessageData.Content = fmt.Sprintf(locale.DETECTED, embed.Title, locale.ORIGINAL, delay)
+		sendMessageData.Content = fmt.Sprintf(locale.DETECTED, fmt.Sprintf("**%s** - %s", embed.Author.Name, embed.Title), locale.ORIGINAL, *globalFlags.delay)
 		break
 	case redirect.Cover:
-		sendMessageData.Content = fmt.Sprintf(locale.DETECTED, embed.Title, locale.COVER, delay)
+		sendMessageData.Content = fmt.Sprintf(locale.DETECTED, fmt.Sprintf("**%s** - %s", embed.Author.Name, embed.Title), locale.COVER, *globalFlags.delay)
 		break
 	case redirect.Stream:
-		sendMessageData.Content = fmt.Sprintf(locale.DETECTED, embed.Title, locale.STREAM, delay)
+		sendMessageData.Content = fmt.Sprintf(locale.DETECTED, fmt.Sprintf("**%s** - %s", embed.Author.Name, embed.Title), locale.STREAM, *globalFlags.delay)
 		break
 	case redirect.None:
-		sendMessageData.Content = fmt.Sprintf(locale.DETECTED_MATCH_NONE, embed.Title, delay)
+		sendMessageData.Content = fmt.Sprintf(locale.DETECTED_MATCH_NONE, fmt.Sprintf("%s - %s", embed.Author.Name, embed.Title), *globalFlags.delay)
 		break
 	case redirect.Unknown:
 		break
 	}
-	logger.Logger.Infof("  Sending...")
 	botM, err := s.SendMessageComplex(om.ChannelID, sendMessageData)
 	if err != nil {
 		log.Printf("[Error] %s", fmt.Errorf("%w", err))
 		return err
 	}
 
-	var reaction string
-	switch rType {
-	case redirect.Original:
-		reaction = reactionOriginal
-		break
-	case redirect.Cover:
-		reaction = reactionCover
-		break
-	case redirect.Stream:
-		reaction = reactionStream
-		break
-	case redirect.None:
-		reaction = reactionNone
-		break
-	case redirect.Unknown:
-		break
-	}
+	// var reaction string
+	// switch rType {
+	// case redirect.Original:
+	// 	reaction = reactionOriginal
+	// 	break
+	// case redirect.Cover:
+	// 	reaction = reactionCover
+	// 	break
+	// case redirect.Stream:
+	// 	reaction = reactionStream
+	// 	break
+	// case redirect.None:
+	// 	reaction = reactionNone
+	// 	break
+	// case redirect.Unknown:
+	// 	break
+	// }
 	
-	logger.Logger.Infof("  Reacting...")
-	err = s.React(botM.ChannelID, botM.ID, discord.APIEmoji(reaction))
-	if err != nil {
-		log.Printf("[Error] %s", fmt.Errorf("%w", err))
-		return err
-	}
+	// logger.Logger.Infof("  Reacting...")
+	// err = s.React(botM.ChannelID, botM.ID, discord.APIEmoji(reaction))
+	// if err != nil {
+	// 	log.Printf("[Error] %s", fmt.Errorf("%w", err))
+	// 	return err
+	// }
 
 	logger.Logger.Infof("  Pending...")
 	pendingEmbeds<-&pendingEmbed{
@@ -124,6 +158,7 @@ func pendEmbed (s *state.State, om *discord.Message, eIndex int, bId int) error 
 		embedIndex: eIndex,
 		bindingId: bId,
 		pendedTime: time.Now(),
+		guess: rType,
 	}
 
 	return nil
@@ -150,7 +185,6 @@ func guess (embed discord.Embed) (redirectType redirect.RedirectType, err error)
 				return redirect.Unknown, err
 			}
 			countCoverKeywords++
-			logger.Logger.Info("Cover+1")
 		}
 	}
 
@@ -168,7 +202,6 @@ func guess (embed discord.Embed) (redirectType redirect.RedirectType, err error)
 				return redirect.Unknown, err
 			}
 			countOriginalKeywords++
-			logger.Logger.Info("Original+1")
 		}
 	}
 
@@ -186,7 +219,6 @@ func guess (embed discord.Embed) (redirectType redirect.RedirectType, err error)
 				return redirect.Unknown, err
 			}
 			countStreamKeywords++
-			logger.Logger.Info("Stream+1")
 		}
 	}
 
