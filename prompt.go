@@ -109,6 +109,7 @@ func handle (input string, s *state.State) (err error) {
 		close(processCloser)
 		break
 	case commandExit:
+		close(processCloser)
 		break
 	case "add_channel":
 	case "add_redirection":
