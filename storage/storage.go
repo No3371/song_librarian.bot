@@ -8,4 +8,5 @@ type StorageProvider interface {
 	RemoveBinding (bId int) (err error)
 	GetBindingCount () (count int, err error)
 	SaveAll () (err error)
+	Close () (err error)
 }

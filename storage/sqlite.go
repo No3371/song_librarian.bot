@@ -336,6 +336,10 @@ func (s *sqlite) SaveAll() (err error) {
 	return nil
 }
 
+func (s *sqlite) Close() (err error) {
+	return s.DB.Close()
+}
+
 func (s *sqlite) GetBindingCount () (count int, err error) {
 	var tx *sql.Tx
 	tx, err = s.BeginTx(context.Background(), &sql.TxOptions{
@@ -446,7 +450,6 @@ func Sqlite () (sv *sqlite, err error) {
 }
 
 func (s *sqlite) tx (stmt string) error {
-	
 	var tx *sql.Tx
 	var err error
 	tx, err = s.BeginTx(context.Background(), &sql.TxOptions{

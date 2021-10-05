@@ -3,9 +3,9 @@ package redirect
 type RedirectType int 
 
 const (
-	Cover RedirectType = iota
+	None RedirectType = iota
+	Cover 
 	Original
 	Stream
-	None
 	Unknown
 )

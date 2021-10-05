@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"strconv"
@@ -20,60 +19,82 @@ const (
 	commandBindRemove = "bind_remove"
 )
 
-func promptLoop (s *state.State, ctx context.Context) {
-	for (true) {
-		select {
-		case <-ctx.Done():
-			return
-		default:
+func startPromptLoop (s *state.State, closer chan struct{}) (promptDone chan struct{}) {
+	promptDone = make(chan struct{})
+	go func (){
+		logger.Logger.Infof("[UI] Prompt loop is starting...")
+		broke := false
+		loopBreaker := func (in string, breakline bool) bool {
+			select {
+			case <-closer:
+				broke = true
+				return true
+			default:
+				return false
+			}
 		}
 
-		input := prompt.Input("", func (d prompt.Document) []prompt.Suggest {
-			if strings.HasPrefix(d.Text, "bind") {
-				return []prompt.Suggest {
-					{
-						Text:        commandBind,
-						Description: "",
-					},
-					{
-						Text:        commandBindQuery,
-						Description: "",
-					},
-					{
-						Text:        commandBindRemove,
-						Description: "",
-					},
-				}
+		
+		loop: for (true) {
+			select {
+			case <-closer:
+				broke = true
+				break loop
+			default:
 			}
 
-			return []prompt.Suggest {
-				{
-					Text:        "add_channel",
-					Description: "",
-				},
-				{
-					Text:        "add_redirection",
-					Description: "",
-				},
-				{
-					Text:        "map",
-					Description: "",
-				},
-				{
-					Text:        "resetcommands",
-					Description: "",
-				},
+			input := prompt.Input("Command: ", suggestions, prompt.OptionSetExitCheckerOnInput(loopBreaker))
+			if broke {
+				break loop
 			}
-		})
-		// if err != nil {
-		// 	fmt.Printf("Prompt failed %v\n", err)
-		// 	return
-		// }
 
-		err := handle(input, s)
-		if err != nil {
-			logger.Logger.Errorf("%v", err)
+			err := handle(input, s)
+			if err != nil {
+				logger.Logger.Errorf("%v", err)
+			}
 		}
+
+		logger.Logger.Infof("[UI] Prompt loop is ended.")
+		close(promptDone)
+	} ()
+	return promptDone
+}
+
+func suggestions (d prompt.Document) []prompt.Suggest {
+	if strings.HasPrefix(d.Text, "bind") {
+		return []prompt.Suggest {
+			{
+				Text:        commandBind,
+				Description: "",
+			},
+			{
+				Text:        commandBindQuery,
+				Description: "",
+			},
+			{
+				Text:        commandBindRemove,
+				Description: "",
+			},
+		}
+	}
+
+	return []prompt.Suggest {
+		{
+			Text:        "add_channel",
+			Description: "",
+		},
+		{
+			Text:        "add_redirection",
+			Description: "",
+		},
+		{
+			Text:        "map",
+			Description: "",
+		},
+		{
+			Text:        "resetcommands",
+			Description: "",
+		},
 	}
 }
 
