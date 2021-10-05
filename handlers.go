@@ -18,7 +18,7 @@ type item struct {
 	c discord.ChannelID
 	m discord.MessageID
 }
-var fetchDelayTimer *time.Timer = time.NewTimer(time.Second * 5)
+var fetchDelayTimer *time.Timer = time.NewTimer(time.Second * 3)
 var buffer chan item
 
 func init () {
@@ -44,9 +44,14 @@ func addHandlers (s *state.State) {
 			if m == nil || err != nil {
 				continue
 			}
+			if time.Now().Sub(m.Timestamp.Time().Local()) < time.Second*3 {
+				<-fetchDelayTimer.C
+				fetchDelayTimer.Reset(time.Second * 3)
+				m, err = s.Message(it.c, it.m)
+			}
 			err = onMessageCreated(s, m)
 			if err != nil {
-				logger.Logger.Errorf("[HANDLER] OnMessageCreated: %v", err)
+				logger.Logger.Errorf("[HANDLER] OnMessageCreated error: %v", err)
 			}
 		}
 	}()
@@ -59,9 +64,6 @@ func onMessageCreated (s *state.State, m *discord.Message) (err error) {
 		}
 	}()
 
-	if len(m.Embeds) == 0 {
-		return nil
-	}
 	if bIds := binding.GetMappedBindingIDs(uint64(m.ChannelID)); bIds != nil {
 		for bId := range bIds {
 			b := binding.QueryBinding(bId)
