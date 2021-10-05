@@ -36,6 +36,7 @@ func addHandlers (s *state.State) {
 			m: e.Message.ID,
 		}
 	})
+
 	go func () {
 		for {
 			it := <-buffer
@@ -65,7 +66,6 @@ func onMessageCreated (s *state.State, m *discord.Message) (err error) {
 				logger.Logger.Errorf("A binding Id is pointing to nil Binding: %d", bId)
 				continue
 			}
-
 			s.MessageStore.MessageSet(*m, true)
 			<-fetchDelayTimer.C
 			fetchDelayTimer.Reset(time.Second * 5)
@@ -151,7 +151,7 @@ func pendEmbed (s *state.State, om *discord.Message, eIndex int, bId int) error 
 	// 	return err
 	// }
 
-	logger.Logger.Infof("  Pending...")
+	logger.Logger.Infof("  Pending embed#%d...", eIndex)
 	pendingEmbeds<-&pendingEmbed{
 		cId: botM.ChannelID,
 		msgID: botM.ID,

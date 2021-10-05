@@ -11,6 +11,7 @@ type flags struct {
 	token *string
 	locale *string
 	delay *int
+	controlPort *uint16
 }
 
 var globalFlags *flags
@@ -24,6 +25,7 @@ func resolveFlags () {
 	globalFlags.token = flag.String("token", "", "discord bot token")
 	globalFlags.locale = flag.String("locale", "TW", "locale code")
 	globalFlags.delay = flag.Int("delay", 5, "")
+	globalFlags.controlPort = flag.Uint16("cport", 11813, "")
 
 	flag.Parse()
 	

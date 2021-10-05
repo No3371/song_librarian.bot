@@ -17,6 +17,7 @@ const (
 	commandBind = "bind"
 	commandBindQuery = "bind_query"
 	commandBindRemove = "bind_remove"
+	commandExit = "exit"
 )
 
 func startPromptLoop (s *state.State, closer chan struct{}) (promptDone chan struct{}) {
@@ -105,6 +106,9 @@ func handle (input string, s *state.State) (err error) {
 	case commandBindRemove:
 		err = unbind()
 	case commandBindQuery:
+		close(processCloser)
+		break
+	case commandExit:
 		break
 	case "add_channel":
 	case "add_redirection":

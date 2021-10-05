@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/signal"
-	"syscall"
+	// "os/signal"
+	// "syscall"
 
 	// "fmt"
 	"log"
@@ -36,21 +36,26 @@ type pendingEmbed struct {
 }
 
 
+var processCloser chan struct{}
+
 func main() {
 	var err error
 	resolveFlags()
 	locale.SetLanguage(locale.FromString(*globalFlags.locale))
 
-	sigs := make(chan os.Signal, 1)
+	// sigs := make(chan os.Signal, 1)
 
-    signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+    // signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 
+
+	processCloser = make(chan struct{})
 
 	var restart bool = true
 	var sessionCloser chan struct{} = make(chan struct{})
     go func() {
-        sig := <-sigs
-		logger.Logger.Infof("Captured EXIT signal: %s", sig)
+        // sig := <-sigs
+        <-processCloser
+		// logger.Logger.Infof("Captured EXIT signal: %s", sig)
 		restart = false
 		go func () {
 			timer := time.NewTimer(time.Second * 10)
