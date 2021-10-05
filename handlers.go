@@ -27,7 +27,7 @@ func init () {
 
 func addHandlers (s *state.State) {
 	s.AddHandler(func (e *gateway.MessageCreateEvent) {
-		if e.Author.Bot || len(e.Embeds) == 0 {
+		if e.Author.Bot {
 			return
 		}
 
@@ -59,6 +59,9 @@ func onMessageCreated (s *state.State, m *discord.Message) (err error) {
 		}
 	}()
 
+	if len(m.Embeds) == 0 {
+		return nil
+	}
 	if bIds := binding.GetMappedBindingIDs(uint64(m.ChannelID)); bIds != nil {
 		for bId := range bIds {
 			b := binding.QueryBinding(bId)
@@ -66,10 +69,12 @@ func onMessageCreated (s *state.State, m *discord.Message) (err error) {
 				logger.Logger.Errorf("A binding Id is pointing to nil Binding: %d", bId)
 				continue
 			}
-			s.MessageStore.MessageSet(*m, true)
-			<-fetchDelayTimer.C
-			fetchDelayTimer.Reset(time.Second * 5)
 			
+			// iErr := s.mes(*m, true)
+			// if iErr != nil {
+			// 	logger.Logger.Infof("[HANDLER] MessageCreateEvent: Update failed: %v", err)
+			// }
+	
 			// Find all bindings bound
 			// For each binding, for each redirection, if the regex match...
 			for ei, e := range m.Embeds {
