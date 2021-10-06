@@ -58,7 +58,7 @@ func addInteractionHandlers(s *state.State) {
 						err = s.RespondInteraction(e.ID, e.Token, api.InteractionResponse{
 							Type: api.MessageInteractionWithSource,
 							Data: &api.InteractionResponseData{
-								Content: option.NewNullableString("Deleted!"),
+								Content: option.NewNullableString("Deleted " + m.URL()),
 							},
 						})
 						if err != nil {
