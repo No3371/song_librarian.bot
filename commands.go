@@ -101,6 +101,20 @@ func assureCommands (s *state.State) (err error) {
 			Name:        commandNameDelete,
 			Description: locale.C_DESC,
 			NoDefaultPermission: false,
+			Options:     []discord.CommandOption{
+				{
+					Type:        discord.ChannelOption,
+					Name:        "c_original",
+					Description: "jibberish",
+					Required:    true,
+				},
+				{
+					Type:        discord.IntegerOption,
+					Name:        "c_cover",
+					Description: "jibberish",
+					Required:    true,
+				},
+			},
 			// Options:     []discord.CommandOption{
 			// 	{
 			// 		Type:        discord.ChannelOption,
