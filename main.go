@@ -221,6 +221,9 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 				delay = time.Second * 5
 			}
 
+			if nextPending == nil {
+				panic("nil pended?")
+			}
 			for passed < delay && nextPending != nil {
 				t.Reset(time.Second * 10)
 				select {
@@ -247,6 +250,25 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 							logger.Logger.Errorf("Failed to remove the bot message: %d", err)
 						}
 						break
+					}
+				}
+			}
+			
+
+			// Do it again because passed < delay may not always be true
+			botMsg, err = s.Message(nextPending.cId, nextPending.msgID)
+			if err != nil || botMsg == nil {
+				// Failed to access the bot message, deleted?
+				logger.Logger.Errorf("Bot message inaccessible: %d", nextPending.msgID)
+				nextPending = nil
+			} else {
+				if originalMsg, err = s.Message(botMsg.Reference.ChannelID, botMsg.Reference.MessageID); originalMsg == nil || err != nil {
+					logger.Logger.Errorf("Original message inaccessible: %d (error? %s)", botMsg.Reference.MessageID, err)
+					nextPending = nil
+					err = s.DeleteMessage(botMsg.ChannelID, botMsg.ID, "Temporary bot message")
+					if err != nil {
+						// Failed to remove the bot message...?
+						logger.Logger.Errorf("Failed to remove the bot message: %d", err)
 					}
 				}
 			}
@@ -361,7 +383,7 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 	return loopDone
 }
 
-func decideType (pending *pendingEmbed,botMsg *discord.Message) (rType redirect.RedirectType, auto bool, err error) {
+func decideType (pending *pendingEmbed, botMsg *discord.Message) (rType redirect.RedirectType, auto bool, err error) {
 	
 	var c_o, c_c, c_s, c_n int
 	var isAuto bool = false
@@ -403,7 +425,7 @@ func decideType (pending *pendingEmbed,botMsg *discord.Message) (rType redirect.
 
 	sum := c_o + c_c + c_s
 	if sum == 0 || (c_n > c_o - 1 && c_n > c_c - 1 && c_n > c_s - 1) {
-		logger.Logger.Infof("[REDIRECT] Result: Cancel.")
+		logger.Logger.Infof("  Result: Cancel.")
 		return redirect.None, isAuto, nil
 	}
 

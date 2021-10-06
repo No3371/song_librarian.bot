@@ -106,7 +106,7 @@ func onMessageCreated (s *state.State, m *discord.Message) (err error) {
 					if b.UrlRegexEnabled(i) {
 						if isMatch, _ := regexUrlMapping[i].MatchString(e.URL); isMatch {
 							atomic.AddUint64(&statSession.UrlRegexMatched, 1)
-							logger.Logger.Infof("Binding#%d - UrlRegex#%d match!", bId, i)
+							logger.Logger.Infof("  Binding#%d - UrlRegex#%d match!", bId, i)
 							if err := pendEmbed(s, m, ei, bId); err != nil {
 								logger.Logger.Errorf("%s", err)
 								continue
@@ -133,20 +133,20 @@ func pendEmbed (s *state.State, om *discord.Message, eIndex int, bId int) error 
 	switch rType {
 	case redirect.Original:
 		if addM, _ := regexClips.MatchString(embed.Title); addM {
-			sendMessageData.Content = fmt.Sprintf(locale.DETECTED_CLIPS, fmt.Sprintf("**%s** %s", embed.Author.Name, embed.Title), int64((*globalFlags.delay).Seconds()))
+			sendMessageData.Content = fmt.Sprintf(locale.DETECTED_CLIPS, fmt.Sprintf("%s", embed.Title), int64((*globalFlags.delay).Seconds()))
 			rType = redirect.None
 		} else {
-			sendMessageData.Content = fmt.Sprintf(locale.DETECTED, fmt.Sprintf("**%s** %s", embed.Author.Name, embed.Title), locale.ORIGINAL, int64((*globalFlags.delay).Seconds()))
+			sendMessageData.Content = fmt.Sprintf(locale.DETECTED, fmt.Sprintf("%s", embed.Title), locale.ORIGINAL, int64((*globalFlags.delay).Seconds()))
 		}
 		break
 	case redirect.Cover:
-		sendMessageData.Content = fmt.Sprintf(locale.DETECTED, fmt.Sprintf("**%s** %s", embed.Author.Name, embed.Title), locale.COVER, int64((*globalFlags.delay).Seconds()))
+		sendMessageData.Content = fmt.Sprintf(locale.DETECTED, fmt.Sprintf("%s", embed.Title), locale.COVER, int64((*globalFlags.delay).Seconds()))
 		break
 	case redirect.Stream:
-		sendMessageData.Content = fmt.Sprintf(locale.DETECTED, fmt.Sprintf("**%s** %s", embed.Author.Name, embed.Title), locale.STREAM, int64((*globalFlags.delay).Seconds()))
+		sendMessageData.Content = fmt.Sprintf(locale.DETECTED, fmt.Sprintf("%s", embed.Title), locale.STREAM, int64((*globalFlags.delay).Seconds()))
 		break
 	case redirect.None:
-		sendMessageData.Content = fmt.Sprintf(locale.DETECTED_MATCH_NONE, fmt.Sprintf("%s - %s", embed.Author.Name, embed.Title), int64((*globalFlags.delay).Seconds()))
+		sendMessageData.Content = fmt.Sprintf(locale.DETECTED_MATCH_NONE, fmt.Sprintf("%s", embed.Title), int64((*globalFlags.delay).Seconds()))
 		break
 	case redirect.Unknown:
 		break
