@@ -179,6 +179,7 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 					break loopBody					
 				}
 			}
+			logger.Logger.Infof("Redirector: new task.")
 			
 			
 			var botMsg *discord.Message

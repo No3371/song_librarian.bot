@@ -104,7 +104,6 @@ func onMessageCreated (s *state.State, m *discord.Message) (err error) {
 				atomic.AddUint64(&statSession.analyzedEmbeds, 1)
 				urlMatching: for i := 0; i < urlRegexCount; i++ {
 					if b.UrlRegexEnabled(i) {
-						logger.Logger.Infof("Url regex #%d is enabled:", i)
 						if isMatch, _ := regexUrlMapping[i].MatchString(e.URL); isMatch {
 							atomic.AddUint64(&statSession.urlRegexMatched, 1)
 							logger.Logger.Infof("Binding#%d - UrlRegex#%d match!", bId, i)
@@ -133,17 +132,16 @@ func pendEmbed (s *state.State, om *discord.Message, eIndex int, bId int) error 
 	var sendMessageData api.SendMessageData = api.SendMessageData{
 		Reference: &discord.MessageReference{ MessageID: om.ID},
 	}
-	logger.Logger.Infof("  Guessing...")
 	rType, err := guess(embed)
 	switch rType {
 	case redirect.Original:
-		sendMessageData.Content = fmt.Sprintf(locale.DETECTED, fmt.Sprintf("**%s** - %s", embed.Author.Name, embed.Title), locale.ORIGINAL, (*globalFlags.delay).Minutes())
+		sendMessageData.Content = fmt.Sprintf(locale.DETECTED, fmt.Sprintf("**%s** %s", embed.Author.Name, embed.Title), locale.ORIGINAL, (*globalFlags.delay).Minutes())
 		break
 	case redirect.Cover:
-		sendMessageData.Content = fmt.Sprintf(locale.DETECTED, fmt.Sprintf("**%s** - %s", embed.Author.Name, embed.Title), locale.COVER, (*globalFlags.delay).Minutes())
+		sendMessageData.Content = fmt.Sprintf(locale.DETECTED, fmt.Sprintf("**%s** %s", embed.Author.Name, embed.Title), locale.COVER, (*globalFlags.delay).Minutes())
 		break
 	case redirect.Stream:
-		sendMessageData.Content = fmt.Sprintf(locale.DETECTED, fmt.Sprintf("**%s** - %s", embed.Author.Name, embed.Title), locale.STREAM, (*globalFlags.delay).Minutes())
+		sendMessageData.Content = fmt.Sprintf(locale.DETECTED, fmt.Sprintf("**%s** %s", embed.Author.Name, embed.Title), locale.STREAM, (*globalFlags.delay).Minutes())
 		break
 	case redirect.None:
 		sendMessageData.Content = fmt.Sprintf(locale.DETECTED_MATCH_NONE, fmt.Sprintf("%s - %s", embed.Author.Name, embed.Title), (*globalFlags.delay).Minutes())
