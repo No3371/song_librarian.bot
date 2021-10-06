@@ -6,6 +6,7 @@ import (
 	"os"
 	"runtime"
 	"runtime/pprof"
+	"sync/atomic"
 
 	// "os/signal"
 	// "syscall"
@@ -96,6 +97,7 @@ func main() {
 }
 
 func session (sCloser chan struct{}) (err error) {
+	var selfCloser chan struct{} = make(chan struct{})
 	logger.Logger.Infof("[MAIN] Session is starting...")
 	sv, err = storage.Sqlite()
 	if err != nil {
@@ -129,6 +131,7 @@ func session (sCloser chan struct{}) (err error) {
 	s.AfterClose = func(innerErr error) {
 		logger.Logger.Errorf("[MAIN] After gateway closed: %s", err)
 		err = innerErr
+		close(selfCloser)
 	}
 
 	if err := s.Open(context.Background()); err != nil {
@@ -145,7 +148,10 @@ func session (sCloser chan struct{}) (err error) {
 
 	promptClosed := startPromptLoop(s, sCloser)
 
-	<-sCloser
+	select {
+	case <-sCloser:
+	case <-selfCloser:
+	}
 	<-promptClosed
 	<-redirectorClosed
 	err = sv.Close()
@@ -291,6 +297,8 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 				logger.Logger.Errorf("F2: %s", err)
 			}
 	
+			atomic.AddUint64(&statSession.redirected, 1)
+
 			err = s.DeleteMessage(botMsg.ChannelID, botMsg.ID, "Temporary bot message")
 			if err != nil {
 				// Failed to remove the bot message...?
