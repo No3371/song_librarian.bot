@@ -11,6 +11,7 @@ import (
 	"No3371.github.com/song_librarian.bot/redirect"
 	"github.com/c-bata/go-prompt"
 	"github.com/diamondburned/arikawa/v3/state"
+	"github.com/kr/pretty"
 )
 
 const (
@@ -118,7 +119,7 @@ func handle (input string, s *state.State) (err error) {
 		resetAllCommands(s)
 		break
 	case "stats":
-		fmt.Printf("[STATS]\n%+v", statSession)
+		pretty.Printf("[STATS]\n%#v", statSession)
 		break
 	default:
 		return errors.New("Unexpected command")
