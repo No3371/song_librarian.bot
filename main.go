@@ -102,6 +102,7 @@ func main() {
 }
 
 func session (sCloser chan struct{}) (err error) {
+	var reconnects int
 	var selfCloser chan struct{} = make(chan struct{})
 	logger.Logger.Infof("[MAIN] Session is starting...")
 	sv, err = storage.Sqlite()
@@ -126,12 +127,17 @@ func session (sCloser chan struct{}) (err error) {
 	// 	logger.Logger.Fatalf("[MAIN] %v", err)
 	// }
 
-	addEventHandlers(s)
+	// addEventHandlers(s)
 
 	s.ErrorLog = func(innerErr error) {
-		logger.Logger.Errorf("[MAIN] Gateway error: %v", err)
-		err = innerErr
-		close(selfCloser)
+		logger.Logger.Errorf("[MAIN] Gateway error: %v", innerErr)
+		if err == gateway.ErrReconnectRequest && reconnects < 1 {
+			s.Reconnect()
+			reconnects++
+		} else {
+			err = innerErr
+			close(selfCloser)
+		}
 	}
 
 	s.FatalErrorCallback = func(innerErr error) {
@@ -146,8 +152,6 @@ func session (sCloser chan struct{}) (err error) {
 		close(selfCloser)
 	}
 	
-	s.Gateway.Resume()
-
 	if err := s.Open(context.Background()); err != nil {
 		logger.Logger.Errorf("[MAIN] %v", err)
 		close(selfCloser)
@@ -168,7 +172,10 @@ func session (sCloser chan struct{}) (err error) {
 		close(selfCloser)
 	case <-selfCloser:
 	}
-	<-promptClosed
+	select {
+	case <-promptClosed:
+	case <-time.NewTimer(time.Second*5).C:
+	}
 	<-redirectorClosed
 	err = sv.Close()
 	if err != nil {

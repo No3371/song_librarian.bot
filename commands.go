@@ -101,7 +101,7 @@ func assureCommands (s *state.State) (err error) {
 			Description: locale.C_DESC,
 			Options:     []discord.CommandOption{
 				{
-					Type:        discord.IntegerOption,
+					Type:        discord.StringOption,
 					Name:        "msg_id",
 					Description: locale.C_DELETE_ID_DESC,
 					Required:    true,
