@@ -40,6 +40,8 @@ var SMSG string
 
 var EXPLAIN_EMBED_RESOLVE string
 
+var STATUS string
+
 func FromString (code string) Locale {
 	code = strings.ToLower(code)
 	switch code {
@@ -90,6 +92,7 @@ func SetLanguage (lang Locale) {
 		SDTYPE_MANUAL = "投票"
 		SMSG = "原文"
 		EXPLAIN_EMBED_RESOLVE = "（內嵌播放）"
+		STATUS = "私訊 `/dm [頻道ID] [訊息ID]` 刪除訊息！"
 		break
 	// case EN:
 	// 	HELLO = "*wake up*"

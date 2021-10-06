@@ -163,6 +163,13 @@ func session (sCloser chan struct{}) (err error) {
 	if err != nil {
 		log.Fatalln("Failed to get myself:", err)
 	}
+	
+	s.UpdateStatus(gateway.UpdateStatusData{
+		Since:      0,
+		Activities: nil,
+		Status:     discord.Status(locale.STATUS),
+		AFK:        false,
+	})
 
 	logger.Logger.Infof("====== %s at your service ======", u.Username)
 
