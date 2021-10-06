@@ -91,6 +91,7 @@ func main() {
 		err = nil
 		err = session(sessionCloser)
 	}
+	statSession.Print()
 	logger.Logger.Infof("SAVE ALL running")
 	binding.SaveAll()
 	logger.Logger.Infof("SAVE ALL finished")

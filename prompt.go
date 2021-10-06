@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strconv"
@@ -12,7 +11,6 @@ import (
 	"No3371.github.com/song_librarian.bot/redirect"
 	"github.com/c-bata/go-prompt"
 	"github.com/diamondburned/arikawa/v3/state"
-	"github.com/kr/pretty"
 )
 
 const (
@@ -120,12 +118,7 @@ func handle (input string, s *state.State) (err error) {
 		resetAllCommands(s)
 		break
 	case "stats":
-		var j []byte
-		j, err = json.Marshal(*statSession)
-		if err != nil {
-			j = []byte("Failed to unmarshal")
-		}
-		pretty.Printf("\n[STATS]\n%s\n", string(j))
+		statSession.Print()
 		break
 	default:
 		return errors.New("Unexpected command")
