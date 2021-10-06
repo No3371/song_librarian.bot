@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strconv"
@@ -119,7 +120,12 @@ func handle (input string, s *state.State) (err error) {
 		resetAllCommands(s)
 		break
 	case "stats":
-		pretty.Printf("\n[STATS]\n%#v\n", statSession)
+		var j []byte
+		j, err = json.Marshal(statSession)
+		if err != nil {
+			j = []byte("Failed to unmarshal")
+		}
+		pretty.Printf("\n[STATS]\n%s\n", string(j))
 		break
 	default:
 		return errors.New("Unexpected command")
