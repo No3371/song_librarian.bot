@@ -137,16 +137,16 @@ func pendEmbed (s *state.State, om *discord.Message, eIndex int, bId int) error 
 	rType, err := guess(embed)
 	switch rType {
 	case redirect.Original:
-		sendMessageData.Content = fmt.Sprintf(locale.DETECTED, fmt.Sprintf("**%s** - %s", embed.Author.Name, embed.Title), locale.ORIGINAL, *globalFlags.delay)
+		sendMessageData.Content = fmt.Sprintf(locale.DETECTED, fmt.Sprintf("**%s** - %s", embed.Author.Name, embed.Title), locale.ORIGINAL, (*globalFlags.delay).Minutes())
 		break
 	case redirect.Cover:
-		sendMessageData.Content = fmt.Sprintf(locale.DETECTED, fmt.Sprintf("**%s** - %s", embed.Author.Name, embed.Title), locale.COVER, *globalFlags.delay)
+		sendMessageData.Content = fmt.Sprintf(locale.DETECTED, fmt.Sprintf("**%s** - %s", embed.Author.Name, embed.Title), locale.COVER, (*globalFlags.delay).Minutes())
 		break
 	case redirect.Stream:
-		sendMessageData.Content = fmt.Sprintf(locale.DETECTED, fmt.Sprintf("**%s** - %s", embed.Author.Name, embed.Title), locale.STREAM, *globalFlags.delay)
+		sendMessageData.Content = fmt.Sprintf(locale.DETECTED, fmt.Sprintf("**%s** - %s", embed.Author.Name, embed.Title), locale.STREAM, (*globalFlags.delay).Minutes())
 		break
 	case redirect.None:
-		sendMessageData.Content = fmt.Sprintf(locale.DETECTED_MATCH_NONE, fmt.Sprintf("%s - %s", embed.Author.Name, embed.Title), *globalFlags.delay)
+		sendMessageData.Content = fmt.Sprintf(locale.DETECTED_MATCH_NONE, fmt.Sprintf("%s - %s", embed.Author.Name, embed.Title), (*globalFlags.delay).Minutes())
 		break
 	case redirect.Unknown:
 		break
