@@ -51,9 +51,9 @@ func addEventHandlers (s *state.State) {
 			if len(m.Embeds) == 0 {
 				atomic.AddUint64(&statSession.FirstFetchEmbeds0, 1)
 			}
-			if time.Now().Sub(m.Timestamp.Time().Local()) < time.Second*3 {
+			if time.Now().Sub(m.Timestamp.Time().Local()) < time.Second*2 {
 				<-fetchDelayTimer.C
-				fetchDelayTimer.Reset(time.Second * 3)
+				fetchDelayTimer.Reset(time.Second * 2)
 				m, err = s.Message(it.c, it.m)
 				if len(m.Embeds) == 0 {
 					atomic.AddUint64(&statSession.SecondFetchEmbeds0, 1)
@@ -85,7 +85,7 @@ func onMessageCreated (s *state.State, m *discord.Message) (err error) {
 
 			if len(m.Embeds) == 0 {
 				<-fetchDelayTimer.C
-				fetchDelayTimer.Reset(time.Second * 3)
+				fetchDelayTimer.Reset(time.Second * 2)
 				m, err = s.Message(m.ChannelID, m.ID)
 				if m == nil || err != nil {
 					logger.Logger.Errorf("The message is gone!? Abort!\n%v", err)
@@ -136,12 +136,7 @@ func pendEmbed (s *state.State, om *discord.Message, eIndex int, bId int) error 
 	rType, err := guess(embed)
 	switch rType {
 	case redirect.Original:
-		if addM, _ := regexClips.MatchString(embed.Title); addM {
-			sendMessageData.Content = fmt.Sprintf(locale.DETECTED_CLIPS, fmt.Sprintf("%s", embed.Title), int64((*globalFlags.delay).Seconds()))
-			rType = redirect.None
-		} else {
-			sendMessageData.Content = fmt.Sprintf(locale.DETECTED, fmt.Sprintf("%s", embed.Title), locale.ORIGINAL, int64((*globalFlags.delay).Seconds()))
-		}
+		sendMessageData.Content = fmt.Sprintf(locale.DETECTED, fmt.Sprintf("%s", embed.Title), locale.ORIGINAL, int64((*globalFlags.delay).Seconds()))
 		break
 	case redirect.Cover:
 		sendMessageData.Content = fmt.Sprintf(locale.DETECTED, fmt.Sprintf("%s", embed.Title), locale.COVER, int64((*globalFlags.delay).Seconds()))
@@ -153,6 +148,11 @@ func pendEmbed (s *state.State, om *discord.Message, eIndex int, bId int) error 
 		sendMessageData.Content = fmt.Sprintf(locale.DETECTED_MATCH_NONE, fmt.Sprintf("%s", embed.Title), int64((*globalFlags.delay).Seconds()))
 		break
 	case redirect.Unknown:
+		sendMessageData.Content = fmt.Sprintf(locale.DETECTED_UNKNOWN, fmt.Sprintf("%s", embed.Title), int64((*globalFlags.delay).Seconds()))
+		break
+	case redirect.Clip:
+		sendMessageData.Content = fmt.Sprintf(locale.DETECTED_CLIPS, fmt.Sprintf("%s", embed.Title), int64((*globalFlags.delay).Seconds()))
+		rType = redirect.None
 		break
 	}
 	botM, err := s.SendMessageComplex(om.ChannelID, sendMessageData)
@@ -216,6 +216,16 @@ func pendEmbed (s *state.State, om *discord.Message, eIndex int, bId int) error 
 
 
 func guess (embed discord.Embed) (redirectType redirect.RedirectType, err error) {
+	defer func () {
+		if redirectType == redirect.None || redirectType == redirect.Unknown {
+			return
+		}
+
+		if addM, _ := regexClips.MatchString(embed.Title); addM {
+			logger.Logger.Infof("  [GUESS] Wait! It looks like a clip!")
+			redirectType = redirect.Clip
+		}
+	} ()
 	var countO = 0
 	var countC = 0
 	var countS = 0
@@ -228,13 +238,16 @@ func guess (embed discord.Embed) (redirectType redirect.RedirectType, err error)
 
 	if m != nil {
 		countC ++
+		logger.Logger.Infof("  [GUESS] Cover: %s (%d)", m.String(), countC)
 		for m != nil {
 			m, err = regexCover_s0.FindNextMatch(m)
 			if err != nil {
 				logger.Logger.Errorf("%s", err)
 				return redirect.Unknown, err
+			} else if m != nil {
+				logger.Logger.Infof("  [GUESS] Cover: %s (%d)", m.String(), countC)
+				countC++
 			}
-			countC++
 		}
 	}
 
@@ -245,13 +258,16 @@ func guess (embed discord.Embed) (redirectType redirect.RedirectType, err error)
 	}
 	if m != nil {
 		countO ++
+		logger.Logger.Infof("  [GUESS] Original: %s (%d)", m.String(), countO)
 		for m != nil {
 			m, err = regexOriginal_s1.FindNextMatch(m)
 			if err != nil {
 				logger.Logger.Errorf("%s", err)
 				return redirect.Unknown, err
+			} else if m != nil {
+				logger.Logger.Infof("  [GUESS] Original: %s (%d)", m.String(), countO)
+				countO++
 			}
-			countO++
 		}
 	}
 
@@ -262,15 +278,20 @@ func guess (embed discord.Embed) (redirectType redirect.RedirectType, err error)
 	}
 	if m != nil {
 		countS ++
+		logger.Logger.Infof("  [GUESS] Stream: %s (%d)", m.String(), countS)
 		for m != nil {
 			m, err = regexStream_s2.FindNextMatch(m)
 			if err != nil {
 				logger.Logger.Errorf("%s", err)
 				return redirect.Unknown, err
+			} else if m != nil {
+				logger.Logger.Infof("  [GUESS] Stream: %s (%d)", m.String(), countS)
+				countS++
 			}
-			countS++
 		}
 	}
+
+	logger.Logger.Infof("  [GUESS] o: %d / c: %d / s: %d", countO, countC, countS)
 
 	if countC + countO + countS == 0 {
 		return redirect.None, nil

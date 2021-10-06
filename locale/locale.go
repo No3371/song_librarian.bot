@@ -21,8 +21,6 @@ var DETECTED_CLIPS string
 var BUTTON_ORIGINAL string
 var BUTTON_COVER string
 var BUTTON_NOT_SONG string
-var FAILED_TO_GUESS string
-var REDIRECT_FORMAT string
 var C_DESC string
 var C_ORIGINAL_DESC string
 var C_COVER_DESC string
@@ -74,12 +72,10 @@ func SetLanguage (lang Locale) {
 		BUTTON_NOT_SONG = "非歌曲"
 		BUTTON_ORIGINAL = "原創"
 		BUTTON_COVER = "翻唱"
-		DETECTED = "偵測到內嵌連結：%s\n根據標題猜測為 **%s**，%d 秒後自動轉發\n可回應手動修正分類：🇴 原創 / 🇨 翻唱 / 🇸 歌回 / ❌ 不轉發"
-		DETECTED_CLIPS = "偵測到疑似🇴 **原創**：%s\n疑似剪輯❌**不轉發**。%d 秒內可回應手動分類：🇴 原創 / 🇨 翻唱 / 🇸 歌回 / ❌ 不轉發"
-		DETECTED_MATCH_NONE = "偵測到內嵌連結：%s\n標題不含任何關鍵字，預設❌**不轉發**\n%d 秒內可回應手動修正分類：🇴 原創 / 🇨 翻唱 / 🇸 歌回 / ❌ 不轉發"
-		DETECTED_UNKNOWN = "偵測到內嵌連結：%s\n猜測失敗❌**不轉發**。%d 秒內可回應手動分類：🇴 原創 / 🇨 翻唱 / 🇸 歌回 / ❌ 不轉發"
-		FAILED_TO_GUESS = "[猜測失敗]"
-		REDIRECT_FORMAT = "分享者：%s\n原文：%s"
+		DETECTED = "**%s**\n**(๑•̀ㅂ•́)و✧**  猜測為 *%s*，%d 秒後自動轉發。可對此訊息投票決定分類：🇴 原創 / 🇨 翻唱 / 🇸 歌回 / ❌ 不轉發"
+		DETECTED_CLIPS = "**%s**\n**|ω・）**  疑似剪輯，預設❌*不轉發*。%d 秒內可對此訊息投票決定分類：🇴 原創 / 🇨 翻唱 / 🇸 歌回 / ❌ 不轉發"
+		DETECTED_MATCH_NONE = "**%s**\n**( ˘•ω•˘ )**  標題不含關鍵字，預設❌*不轉發*。%d 秒內可對此訊息投票決定分類：🇴 原創 / 🇨 翻唱 / 🇸 歌回 / ❌ 不轉發"
+		DETECTED_UNKNOWN = "**%s**\n**(ﾟ∀。)**  瓦卡拉奈，預設❌*不轉發*。多拉 A 夢幫幫我！%d 秒內可對此訊息投票決定分類：🇴 原創 / 🇨 翻唱 / 🇸 歌回 / ❌ 不轉發"
 		C_DESC = "channel"
 		C_COVER_DESC = "翻唱歌曲頻道 ID"
 		C_ORIGINAL_DESC = "原創歌曲頻道 ID"
@@ -89,7 +85,7 @@ func SetLanguage (lang Locale) {
 		SHARER = "分享者"
 		SDTYPE = "判定"
 		SDTYPE_AUTO = "機器人"
-		SDTYPE_MANUAL = "投票"
+		SDTYPE_MANUAL = "投票🗳️"
 		SMSG = "原文"
 		EXPLAIN_EMBED_RESOLVE = "（內嵌播放）"
 		ACTIVITY = "私訊 `/dm [頻道ID] [訊息ID]` 刪除我的訊息！"

@@ -467,7 +467,7 @@ func decideType (pending *pendingEmbed, botMsg *discord.Message) (rType redirect
 	}
 
 
-	logger.Logger.Infof("  O: %d, C: %d, S: %d, N: %d", c_o, c_c, c_s, c_n)
+	logger.Logger.Infof("  o: %d / c: %d / s: %d / n: %d", c_o, c_c, c_s, c_n)
 
 	sum := c_o + c_c + c_s
 	if sum == 0 || (c_n > c_o - 1 && c_n > c_c - 1 && c_n > c_s - 1) {

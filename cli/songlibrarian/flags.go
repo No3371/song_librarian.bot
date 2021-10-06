@@ -9,6 +9,7 @@ import (
 
 type flags struct {
 	dev *bool
+	debugRegex *bool
 	appid *int64
 	token *string
 	locale *string
@@ -23,6 +24,7 @@ func resolveFlags () {
 		globalFlags = &flags{}
 	}
 	globalFlags.dev = flag.Bool("dev", false, "development mode")
+	globalFlags.debugRegex = flag.Bool("regex", false, "")
 	globalFlags.appid = flag.Int64("appid", 0, "discord app id")
 	globalFlags.token = flag.String("token", "", "discord bot token")
 	globalFlags.locale = flag.String("locale", "TW", "locale code")

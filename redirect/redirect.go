@@ -8,4 +8,5 @@ const (
 	Original
 	Stream
 	Unknown
+	Clip
 )
