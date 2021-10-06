@@ -119,9 +119,6 @@ func onMessageCreated (s *state.State, m *discord.Message) (err error) {
 				}
 			}
 		}
-	} else {
-		logger.Logger.Infof("No mapped binding")
-
 	}
 
 	return nil
