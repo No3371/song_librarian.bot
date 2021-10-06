@@ -20,9 +20,9 @@ type stats struct {
 var statSession *stats
 
 func (s *stats) Print() {
-	j, err := json.Marshal(*s)
+	j, err := json.MarshalIndent(*s, "", "  ")
 	if err != nil {
 		j = []byte("Failed to marshal")
 	}
-	fmt.Printf("\n[STATS] Redirect rate: %f , \n%s\n", float64(statSession.AnalyzedEmbeds)/float64(statSession.MessageEvents), string(j))
+	fmt.Printf("\n[STATS] Redirect rate: %0.2f%%\n%s\n", float64(statSession.Redirected)/float64(statSession.AnalyzedEmbeds), string(j))
 }
