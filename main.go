@@ -127,7 +127,7 @@ func session (sCloser chan struct{}) (err error) {
 	// 	logger.Logger.Fatalf("[MAIN] %v", err)
 	// }
 
-	// addEventHandlers(s)
+	addEventHandlers(s)
 	addInteractionHandlers(s)
 
 	s.ErrorLog = func(innerErr error) {
