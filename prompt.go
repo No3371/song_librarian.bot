@@ -117,6 +117,9 @@ func handle (input string, s *state.State) (err error) {
 	case "resetcommands":
 		resetAllCommands(s)
 		break
+	case "stats":
+		fmt.Printf("[STATS]\n%+v", statSession)
+		break
 	default:
 		return errors.New("Unexpected command")
 	}

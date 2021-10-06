@@ -45,6 +45,7 @@ func main() {
 	var err error
 	resolveFlags()
 	locale.SetLanguage(locale.FromString(*globalFlags.locale))
+	statSession = &stats{}
 
 	if *globalFlags.dev {
         f, err := os.Create("./cpuprof")
