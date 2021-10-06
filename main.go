@@ -128,6 +128,7 @@ func session (sCloser chan struct{}) (err error) {
 	// }
 
 	// addEventHandlers(s)
+	addInteractionHandlers(s)
 
 	s.ErrorLog = func(innerErr error) {
 		logger.Logger.Errorf("[MAIN] Gateway error: %v", innerErr)
