@@ -180,7 +180,7 @@ func session (sCloser chan struct{}) (err error) {
 		Activities: [] discord.Activity {
 			{
 				Name: locale.ACTIVITY,
-				Type: discord.ListeningActivity,
+				Type: discord.CustomActivity,
 			},
 		},
 		Status:     discord.OnlineStatus,
