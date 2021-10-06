@@ -119,7 +119,7 @@ func handle (input string, s *state.State) (err error) {
 		resetAllCommands(s)
 		break
 	case "stats":
-		pretty.Printf("[STATS]\n%#v", statSession)
+		pretty.Printf("\n[STATS]\n%#v\n", statSession)
 		break
 	default:
 		return errors.New("Unexpected command")
