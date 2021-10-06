@@ -78,7 +78,7 @@ func SetLanguage (lang Locale) {
 		DETECTED_UNKNOWN = "偵測到內嵌連結：%s\n猜測失敗❌**不轉發**。%d 分鐘內可回應手動分類：：🇴 原創 / 🇨 翻唱 / 🇸 歌回 / ❌ 不轉發"
 		FAILED_TO_GUESS = "[猜測失敗]"
 		REDIRECT_FORMAT = "分享者：%s\n原文：%s"
-		C_DESC = "設定分類頻道"
+		C_DESC = "channel"
 		C_COVER_DESC = "翻唱歌曲頻道 ID"
 		C_ORIGINAL_DESC = "原創歌曲頻道 ID"
 		ORIGINAL = "🇴 原創"

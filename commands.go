@@ -101,9 +101,13 @@ func assureCommands (s *state.State) (err error) {
 			Description: locale.C_DESC,
 			Options:     []discord.CommandOption{
 				{
-					Type:        discord.StringOption,
+					Type:        discord.ChannelOption,
+					Name:        "c_id",
+					Required:    true,
+				},
+				{
+					Type:        discord.IntegerOption,
 					Name:        "msg_id",
-					Description: locale.C_DELETE_ID_DESC,
 					Required:    true,
 				},
 			},
@@ -113,15 +117,16 @@ func assureCommands (s *state.State) (err error) {
 			logger.Logger.Errorf("Command creation error: %v", err)
 		} else {
 			logger.Logger.Infof("DELETE command created: %d", cmdR.ID)
-			sv.SaveCommandId(int(DeleteRedirectedMessage), uint64(cmdR.ID))
+			sv.SaveCommandId(int(DeleteRedirectedMessage), uint64(cmdR.ID), 0)
 			commandIdMap[cmdR.ID] = DeleteRedirectedMessage
 		}
 	} else {
 		var savedCmdId uint64
-		savedCmdId, err = sv.LoadCommandId(int(DeleteRedirectedMessage))
+		var savedCmdVersion uint32
+		savedCmdId, savedCmdVersion, err = sv.LoadCommandId(int(DeleteRedirectedMessage))
 		if savedCmdId != uint64(cmd.ID) {
 			logger.Logger.Errorf("Command ID Mismatch! Overriding with online ID!")
-			sv.SaveCommandId(int(DeleteRedirectedMessage), uint64(cmd.ID))
+			sv.SaveCommandId(int(DeleteRedirectedMessage), uint64(cmd.ID), savedCmdVersion)
 			commandIdMap[discord.CommandID(savedCmdId)] = DeleteRedirectedMessage
 		} else {
 			commandIdMap[discord.CommandID(savedCmdId)] = DeleteRedirectedMessage
@@ -172,20 +177,22 @@ func resetAllCommands (s *state.State) (err error) {
 	var commands []discord.Command
 	commands, err = s.Commands(discord.AppID(*globalFlags.appid))
 	if err != nil {
-		logger.Logger.Errorf("[MAIN] %v", err)
+		logger.Logger.Errorf("Failed to get owned commands: %v", err)
 		return err
 	}
+
 	for _, c := range  commands{
 		err = s.DeleteCommand(c.AppID, c.ID)
+		logger.Logger.Infof("Deleting command: %s", c.Name)
 		if err != nil {
-			logger.Logger.Errorf("[MAIN] %v", err)
+			logger.Logger.Errorf("Failed to delete command: %v", err)
 			return err
 		}
 	}
 
 	err = assureCommands(s)
 	if err != nil {
-		logger.Logger.Fatalf("[MAIN] %v", err)
+		logger.Logger.Fatalf("Failed to assure commands: %v", err)
 		return err
 	}
 

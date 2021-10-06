@@ -388,7 +388,7 @@ func (s *sqlite) GetBindingCount () (count int, err error) {
 
 }
 
-func (s *sqlite) SaveCommandId(defId int, cmdId uint64) (err error) {
+func (s *sqlite) SaveCommandId(defId int, cmdId uint64, version uint32) (err error) {
 	var tx *sql.Tx
 	tx, err = s.BeginTx(context.Background(), &sql.TxOptions{
 		Isolation: 0,
@@ -439,9 +439,9 @@ func (s *sqlite) SaveCommandId(defId int, cmdId uint64) (err error) {
 		stmt := fmt.Sprintf(
 		`
 		UPDATE Commands
-		SET CD = %d, CMD_ID = '%s'
+		SET CD = %d, CMD_ID = '%s', V = %d
 		WHERE CD = %d;
-		`, defId, strconv.FormatUint(cmdId, 10), defId)
+		`, defId, strconv.FormatUint(cmdId, 10), version, defId)
 		
 		_, err = tx.Exec(stmt)
 		if err != nil {
@@ -450,9 +450,9 @@ func (s *sqlite) SaveCommandId(defId int, cmdId uint64) (err error) {
 	} else {
 		stmt := fmt.Sprintf(
 		`
-		INSERT INTO Commands (CD, CMD_ID)
-		VALUES (%d, '%s');
-		`, defId, strconv.FormatUint(cmdId, 10))
+		INSERT INTO Commands (CD, CMD_ID, V)
+		VALUES (%d, '%s', %d);
+		`, defId, strconv.FormatUint(cmdId, 10), version)
 		
 		_, err = tx.Exec(stmt)
 		if err != nil {
@@ -464,7 +464,7 @@ func (s *sqlite) SaveCommandId(defId int, cmdId uint64) (err error) {
 	return nil
 }
 
-func (s *sqlite) LoadCommandId(defId int) (cmdId uint64, err error) {
+func (s *sqlite) LoadCommandId(defId int) (cmdId uint64, version uint32, err error) {
 	var tx *sql.Tx
 	tx, err = s.BeginTx(context.Background(), &sql.TxOptions{
 		Isolation: 0,
@@ -484,7 +484,7 @@ func (s *sqlite) LoadCommandId(defId int) (cmdId uint64, err error) {
 	} ()
 	query := fmt.Sprintf(
 	`
-	SELECT CMD_ID
+	SELECT CMD_ID, V
 	FROM Commands
 	WHERE CD = %d;
 	`, defId)
@@ -492,33 +492,42 @@ func (s *sqlite) LoadCommandId(defId int) (cmdId uint64, err error) {
 	var rows *sql.Rows
 	rows, err = tx.Query(query)
 	if err != nil {
-		return 0, err
+		return 0, 0, err
 	}
 
 	var j string
+	var v uint32
 	
 	for rows.Next() {
-		err = rows.Scan(&j)
+		err = rows.Scan(&j, &v)
 		if err != nil {
-			return 0, err
+			return 0, 0, err
 		}
 	}
 	err = rows.Err()
 	if err != nil {
-		return 0, err
+			return 0, 0, err
 	}
 	rows.Close()
 
 	if j == "" {
-		return 0, err
+			return 0, 0, err
 	}
 
 	cmdId, err = strconv.ParseUint(j, 10, 64)
 	if err != nil {
-		return 0, err
+			return 0, 0, err
 	}
 	
-	return cmdId, nil
+	var _version uint64
+	_version, err = strconv.ParseUint(j, 10, 32)
+	if err != nil {
+			return 0, 0, err
+	}
+
+	version = uint32(_version)
+	
+	return cmdId, version, nil
 }
 
 
@@ -602,7 +611,8 @@ func Sqlite () (sv *sqlite, err error) {
 		err = sv.tx(`
 		CREATE TABLE Commands (
 			CD int,
-			CMD_ID string
+			CMD_ID string,
+			V int
 		)
 		`)
 		if err != nil {
@@ -610,6 +620,11 @@ func Sqlite () (sv *sqlite, err error) {
 		} else {
 			logger.Logger.Infof("[Storage] Created table \"Commands\".")
 		}
+	} else {
+		sv.tx(`
+		ALTER TABLE Commands
+		ADD V int
+		`)
 	}
 
 	

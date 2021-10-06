@@ -10,8 +10,8 @@ type StorageProvider interface {
 
 	GetBindingCount () (count int, err error)
 
-	SaveCommandId (defId int, cmdId uint64) (err error)
-	LoadCommandId (defId int) (cmdId uint64, err error)
+	SaveCommandId (defId int, cmdId uint64, version uint32) (err error)
+	LoadCommandId (defId int) (cmdId uint64, version uint32, err error)
 
 	SaveAll () (err error)
 	Close () (err error)
