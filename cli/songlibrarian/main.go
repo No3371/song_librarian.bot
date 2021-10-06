@@ -303,12 +303,16 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 			}
 	
 			// Check if the original message is not deleted
-			var isAuto bool
+			var isAuto, isGuessCorrect bool
 			var rType redirect.RedirectType
 			rType, isAuto, err = decideType(nextPending, botMsg)
 			if err != nil {
 				// Failed to remove the bot message...?
 				logger.Logger.Errorf("Failed to decide type: %v", err)
+			}
+
+			if rType == nextPending.guess {
+				isGuessCorrect = true
 			}
 			
 			if rType == redirect.None {
@@ -336,7 +340,7 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 			logger.Logger.Infof("  Redirecting to channel %d", destCId)
 			
 			var data *api.SendMessageData
-			data, err = prepareRedirectionMessage(originalMsg, nextPending, isAuto)
+			data, err = prepareRedirectionMessage(originalMsg, nextPending, isAuto, isGuessCorrect)
 			if err != nil {
 				logger.Logger.Errorf("Failed to prepare redirection message!\n%v", err)
 			}
@@ -371,7 +375,7 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 	return loopDone
 }
 
-func prepareRedirectionMessage (originalMsg *discord.Message, nextPending *pendingEmbed, isAuto bool) (data *api.SendMessageData, err error) {
+func prepareRedirectionMessage (originalMsg *discord.Message, nextPending *pendingEmbed, isAuto bool, isGuessCorrect bool) (data *api.SendMessageData, err error) {
 	defer func () {
 		if err == nil {
 			if pErr := recover(); pErr != nil {
@@ -409,10 +413,14 @@ func prepareRedirectionMessage (originalMsg *discord.Message, nextPending *pendi
 					{
 						Name: locale.SDTYPE,
 						Value: func () string{
-							if isAuto {
+							if isAuto  {
 								return locale.SDTYPE_AUTO
 							} else {
-								return locale.SDTYPE_MANUAL
+								if isGuessCorrect {
+									return locale.SDTYPE_MANUAL
+								} else {
+									return locale.SDTYPE_MANUAL_CORRECTION
+								}
 							}
 						} (),
 						Inline: true,

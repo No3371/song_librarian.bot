@@ -34,6 +34,7 @@ var SHARER string
 var SDTYPE string
 var SDTYPE_AUTO string
 var SDTYPE_MANUAL string
+var SDTYPE_MANUAL_CORRECTION string
 var SMSG string
 
 var EXPLAIN_EMBED_RESOLVE string
@@ -84,8 +85,9 @@ func SetLanguage (lang Locale) {
 		STREAM = "🇸 歌回"
 		SHARER = "分享者"
 		SDTYPE = "判定"
-		SDTYPE_AUTO = "機器人"
-		SDTYPE_MANUAL = "投票🗳️"
+		SDTYPE_AUTO = "機器人🤖"
+		SDTYPE_MANUAL = "投票確認✔️"
+		SDTYPE_MANUAL_CORRECTION = "投票修正🗳️"
 		SMSG = "原文"
 		EXPLAIN_EMBED_RESOLVE = "（內嵌播放）"
 		ACTIVITY = "私訊 `/dm [頻道ID] [訊息ID]` 刪除我的訊息！"
