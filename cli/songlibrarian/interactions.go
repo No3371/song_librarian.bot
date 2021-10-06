@@ -39,15 +39,16 @@ func addInteractionHandlers(s *state.State) {
 					logger.Logger.Infof("Need atleast 2 options provided")
 					return
 				}
-				logger.Logger.Infof("  DELETE (%s): %s - %s", data.Name, data.Options[0], data.Options[1])
+				logger.Logger.Infof("  DELETE")
 				var cId uint64
 				cId, err = strconv.ParseUint(data.Options[0].String(), 10, 64)
 				if err != nil {
 					logger.Logger.Infof("Failed to parse channel Id: %s", data.Options[0])
 					return
 				}
-				deleted := make([]string, len(data.Options) - 1)
+				deleted := make([]string, 0)
 				for i := 1; i < len(data.Options); i++ {
+					logger.Logger.Infof("  DELETE (%s): %s - %s", data.Name, data.Options[0], data.Options[i])
 					var mId uint64
 					mId, err = strconv.ParseUint(data.Options[i].String(), 10, 64)
 					if err != nil {
@@ -68,7 +69,7 @@ func addInteractionHandlers(s *state.State) {
 					}
 				}
 				sb := strings.Builder{}
-				_, err = sb.WriteString(fmt.Sprintf("Deleted %d/%d \n", len(deleted), len(data.Options)))
+				_, err = sb.WriteString(fmt.Sprintf("Deleted %d/%d \n", len(deleted), len(data.Options) - 1))
 				for _, url := range deleted {
 					sb.WriteString("Deleted ")
 					sb.WriteString(url)
