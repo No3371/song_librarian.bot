@@ -32,6 +32,9 @@ var COVER    string
 var STREAM    string
 
 var SHARER string
+var SDTYPE string
+var SDTYPE_AUTO string
+var SDTYPE_MANUAL string
 var SMSG string
 
 var EXPLAIN_EMBED_RESOLVE string
@@ -80,6 +83,9 @@ func SetLanguage (lang Locale) {
 		COVER = "🇨 翻唱"
 		STREAM = "🇸 歌回"
 		SHARER = "分享者"
+		SDTYPE = "判定"
+		SDTYPE_AUTO = "機器人"
+		SDTYPE_MANUAL = "投票"
 		SMSG = "原文"
 		EXPLAIN_EMBED_RESOLVE = "（內嵌播放）"
 		break

@@ -227,8 +227,10 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 			// Check if the original message is not deleted
 
 		
+			var isAuto bool
 			var rType redirect.RedirectType
 			rType, err = decideType(nextPending, botMsg)
+			rType, isAuto, err = decideType(nextPending, botMsg)
 			if err != nil {
 				// Failed to remove the bot message...?
 				logger.Logger.Errorf("Failed to decide type: %v", err)
@@ -285,6 +287,17 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 								Value: originalMsg.URL(),
 								Inline: true,
 							},
+							{
+								Name: locale.SDTYPE,
+								Value: func () string{
+									if isAuto {
+										return locale.SDTYPE_AUTO
+									} else {
+										return locale.SDTYPE_MANUAL
+									}
+								} (),
+								Inline: true,
+							},
 						},
 					},
 				},
@@ -320,9 +333,10 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 	return loopDone
 }
 
-func decideType (pending *pendingEmbed,botMsg *discord.Message) (rType redirect.RedirectType, err error) {
+func decideType (pending *pendingEmbed,botMsg *discord.Message) (rType redirect.RedirectType, auto bool, err error) {
 	
 	var c_o, c_c, c_s, c_n int
+	var isAuto bool = false
 
 	for _, r := range botMsg.Reactions {
 		switch r.Emoji.Name {
@@ -342,6 +356,7 @@ func decideType (pending *pendingEmbed,botMsg *discord.Message) (rType redirect.
 	}
 
 	if c_o + c_c + c_s + c_n == 0 { // If no user vote, apply guess
+		isAuto = true
 		switch pending.guess {
 		case redirect.Original:
 			c_o++
@@ -361,7 +376,7 @@ func decideType (pending *pendingEmbed,botMsg *discord.Message) (rType redirect.
 	sum := c_o + c_c + c_s
 	if sum == 0 || (c_n > c_o - 1 && c_n > c_c - 1 && c_n > c_s - 1) {
 		logger.Logger.Infof("[REDIRECT] Result: Cancel.")
-		return redirect.None, nil
+		return redirect.None, isAuto, nil
 	}
 
 	if c_o > c_c && c_o > c_s {
@@ -376,5 +391,5 @@ func decideType (pending *pendingEmbed,botMsg *discord.Message) (rType redirect.
 		rType = redirect.Cover
 	}
 
-	return rType, nil
+	return rType, isAuto, nil
 }
