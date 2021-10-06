@@ -205,6 +205,7 @@ func pendEmbed (s *state.State, om *discord.Message, eIndex int, bId int) error 
 		cId: botM.ChannelID,
 		msgID: botM.ID,
 		embedIndex: eIndex,
+		urlValidation: om.Embeds[eIndex].URL,
 		bindingId: bId,
 		pendedTime: time.Now(),
 		guess: rType,

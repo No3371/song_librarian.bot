@@ -34,6 +34,7 @@ type pendingEmbed struct {
 	cId discord.ChannelID
 	msgID discord.MessageID
 	embedIndex int
+	urlValidation string
 	bindingId int
 	pendedTime time.Time
 	guess redirect.RedirectType
@@ -286,6 +287,14 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 						// Failed to remove the bot message...?
 						logger.Logger.Errorf("Failed to remove the bot message: %d", err)
 					}
+				} else if originalMsg.Embeds == nil || len(originalMsg.Embeds) == 0 {
+					logger.Logger.Infof("[!] Original message has no embeds...? Abort!")
+					nextPending = nil
+					err = s.DeleteMessage(botMsg.ChannelID, botMsg.ID, "Temporary bot message")
+					if err != nil {
+						// Failed to remove the bot message...?
+						logger.Logger.Errorf("Failed to remove the bot message: %d", err)
+					}
 				}
 			}
 
@@ -324,53 +333,16 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 				continue // cancel
 			}
 
-			logger.Logger.Infof("[REDIRECT] Redirecting to channel %d", destCId)
-	
-			data := api.SendMessageData{
-				Content:    "ｷﾀ━━ｷﾀ━━ｷﾀ──────────==========≡≡≡≡≡Σ≡Σ(((つ•̀ㅂ•́)و \\*✧\\*✧\\*✧ ",
-				Embeds:     []discord.Embed{
-					{
-						Type: discord.NormalEmbed,
-						Title: originalMsg.Embeds[nextPending.embedIndex].Title,
-						// Description: originalMsg.Embeds[nextPending.embedIndex].Description,
-						URL: originalMsg.Embeds[nextPending.embedIndex].URL,
-						// Timestamp: originalMsg.Embeds[nextPending.embedIndex].Timestamp,
-						// Footer: originalMsg.Embeds[nextPending.embedIndex].Footer,
-						Color: originalMsg.Embeds[nextPending.embedIndex].Color,
-						Provider: &discord.EmbedProvider{
-							Name: originalMsg.Embeds[nextPending.embedIndex].Provider.Name,
-							URL: originalMsg.Embeds[nextPending.embedIndex].Provider.URL,
-						},
-						Author: originalMsg.Embeds[nextPending.embedIndex].Author,
-						Fields: []discord.EmbedField {
-							{
-								Name: locale.SHARER,
-								Value: originalMsg.Author.Username + "#" + originalMsg.Author.Discriminator,
-								Inline: true,
-							},
-							{
-								Name: locale.SMSG,
-								Value: originalMsg.URL(),
-								Inline: true,
-							},
-							{
-								Name: locale.SDTYPE,
-								Value: func () string{
-									if isAuto {
-										return locale.SDTYPE_AUTO
-									} else {
-										return locale.SDTYPE_MANUAL
-									}
-								} (),
-								Inline: true,
-							},
-						},
-					},
-				},
+			logger.Logger.Infof("  Redirecting to channel %d", destCId)
+			
+			var data *api.SendMessageData
+			data, err = prepareRedirectionMessage(originalMsg, nextPending, isAuto)
+			if err != nil {
+				logger.Logger.Errorf("Failed to prepare redirection message!\n%v", err)
 			}
 	
 			_, err := s.SendMessageComplex(
-				discord.ChannelID(destCId), data,
+				discord.ChannelID(destCId), *data,
 			)
 	
 			if err != nil {
@@ -399,8 +371,66 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 	return loopDone
 }
 
+func prepareRedirectionMessage (originalMsg *discord.Message, nextPending *pendingEmbed, isAuto bool) (data *api.SendMessageData, err error) {
+	defer func () {
+		if err == nil {
+			if pErr := recover(); pErr != nil {
+				err = pErr.(error)
+			}
+		}
+	} ()
+	return  &api.SendMessageData{
+		Content:    "ｷﾀ━━ｷﾀ━━ｷﾀ──────────==========≡≡≡≡≡Σ≡Σ(((つ•̀ㅂ•́)و \\*✧\\*✧\\*✧ ",
+		Embeds:     []discord.Embed{
+			{
+				Type: discord.NormalEmbed,
+				Title: originalMsg.Embeds[nextPending.embedIndex].Title,
+				// Description: originalMsg.Embeds[nextPending.embedIndex].Description,
+				URL: originalMsg.Embeds[nextPending.embedIndex].URL,
+				// Timestamp: originalMsg.Embeds[nextPending.embedIndex].Timestamp,
+				// Footer: originalMsg.Embeds[nextPending.embedIndex].Footer,
+				Color: originalMsg.Embeds[nextPending.embedIndex].Color,
+				Provider: &discord.EmbedProvider{
+					Name: originalMsg.Embeds[nextPending.embedIndex].Provider.Name,
+					URL: originalMsg.Embeds[nextPending.embedIndex].Provider.URL,
+				},
+				Author: originalMsg.Embeds[nextPending.embedIndex].Author,
+				Fields: []discord.EmbedField {
+					{
+						Name: locale.SHARER,
+						Value: originalMsg.Author.Username + "#" + originalMsg.Author.Discriminator,
+						Inline: true,
+					},
+					{
+						Name: locale.SMSG,
+						Value: originalMsg.URL(),
+						Inline: true,
+					},
+					{
+						Name: locale.SDTYPE,
+						Value: func () string{
+							if isAuto {
+								return locale.SDTYPE_AUTO
+							} else {
+								return locale.SDTYPE_MANUAL
+							}
+						} (),
+						Inline: true,
+					},
+				},
+			},
+		},
+	}, nil
+}
+
 func decideType (pending *pendingEmbed, botMsg *discord.Message) (rType redirect.RedirectType, auto bool, err error) {
 	
+	if pending.urlValidation != botMsg.ReferencedMessage.Embeds[pending.embedIndex].URL {
+		logger.Logger.Infof("  Url modified, abort.")
+		return redirect.None, true, nil
+
+	}
+
 	var c_o, c_c, c_s, c_n int
 	var isAuto bool = false
 
