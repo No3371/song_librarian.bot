@@ -104,13 +104,13 @@ func assureCommands (s *state.State) (err error) {
 			Options:     []discord.CommandOption{
 				{
 					Type:        discord.ChannelOption,
-					Name:        "c_original",
+					Name:        "c",
 					Description: "jibberish",
 					Required:    true,
 				},
 				{
 					Type:        discord.IntegerOption,
-					Name:        "c_cover",
+					Name:        "m",
 					Description: "jibberish",
 					Required:    true,
 				},
