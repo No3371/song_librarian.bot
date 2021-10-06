@@ -83,6 +83,7 @@ func main() {
 		} ()
         close(sessionCloser)
     }()
+	loopTimer := time.NewTimer(time.Second * 10)
 	for restart {
 		if err != nil {
 			logger.Logger.Errorf("[MAIN] Previous session closed with error: %v", err)
@@ -90,6 +91,8 @@ func main() {
 		}
 		err = nil
 		err = session(sessionCloser)
+		<-loopTimer.C
+		loopTimer.Reset(time.Second * 10)
 	}
 	statSession.Print()
 	logger.Logger.Infof("SAVE ALL running")
@@ -116,7 +119,7 @@ func session (sCloser chan struct{}) (err error) {
 
 	pendingEmbeds = make(chan *pendingEmbed, 1024)
 
-	redirectorClosed := redirectorLoop(s, sCloser)
+	redirectorClosed := redirectorLoop(s, selfCloser)
 
 	// err = assureCommands(s)
 	// if err != nil {
@@ -124,20 +127,30 @@ func session (sCloser chan struct{}) (err error) {
 	// }
 
 	addEventHandlers(s)
-	// addInteractionHandlers(s)
 
-	s.FatalErrorCallback = func(innerErr error) {
-		logger.Logger.Errorf("[MAIN] Fatal gateway error: %s", err)
-	}
-
-	s.AfterClose = func(innerErr error) {
-		logger.Logger.Errorf("[MAIN] After gateway closed: %s", err)
+	s.ErrorLog = func(innerErr error) {
+		logger.Logger.Errorf("[MAIN] Gateway error: %v", err)
 		err = innerErr
 		close(selfCloser)
 	}
 
+	s.FatalErrorCallback = func(innerErr error) {
+		logger.Logger.Errorf("[MAIN] Fatal gateway error: %v", err)
+		err = innerErr
+		close(selfCloser)
+	}
+
+	s.AfterClose = func(innerErr error) {
+		logger.Logger.Errorf("[MAIN] After gateway closed: %v", err)
+		err = innerErr
+		close(selfCloser)
+	}
+	
+	s.Gateway.Resume()
+
 	if err := s.Open(context.Background()); err != nil {
-		logger.Logger.Fatalf("[MAIN] %v", err)
+		logger.Logger.Errorf("[MAIN] %v", err)
+		close(selfCloser)
 	}
 	defer s.Close()
 
@@ -148,10 +161,11 @@ func session (sCloser chan struct{}) (err error) {
 
 	logger.Logger.Infof("====== %s at your service ======", u.Username)
 
-	promptClosed := startPromptLoop(s, sCloser)
+	promptClosed := startPromptLoop(s, selfCloser)
 
 	select {
 	case <-sCloser:
+		close(selfCloser)
 	case <-selfCloser:
 	}
 	<-promptClosed
