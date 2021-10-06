@@ -110,9 +110,21 @@ func assureCommands (s *state.State) (err error) {
 				},
 				{
 					Type:        discord.StringOption,
-					Name:        "m",
+					Name:        "m1",
 					Description: "jibberish",
 					Required:    true,
+				},
+				{
+					Type:        discord.StringOption,
+					Name:        "m2",
+					Description: "jibberish",
+					Required:    false,
+				},
+				{
+					Type:        discord.StringOption,
+					Name:        "m3",
+					Description: "jibberish",
+					Required:    false,
 				},
 			},
 			// Options:     []discord.CommandOption{
