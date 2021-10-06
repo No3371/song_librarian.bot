@@ -44,7 +44,7 @@ func startPromptLoop (s *state.State, closer chan struct{}) (promptDone chan str
 			default:
 			}
 
-			input := prompt.Input("Command: ", suggestions, prompt.OptionSetExitCheckerOnInput(loopBreaker))
+			input := prompt.Input("Command: ", noopCompleter, prompt.OptionSetExitCheckerOnInput(loopBreaker))
 			if broke {
 				break loop
 			}
