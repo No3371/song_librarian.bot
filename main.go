@@ -188,7 +188,8 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 			if *globalFlags.dev {
 				delay = time.Second * 5
 			}
-			if (passed < delay && nextPending != nil) {
+
+			for passed < delay && nextPending != nil {
 				t.Reset(time.Second * 10)
 				select {
 					case <-t.C:
@@ -215,6 +216,11 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 						continue // error skip
 					}
 				}
+			}
+
+			if nextPending == nil {
+				nextPending = nil
+				continue // cancel
 			}
 	
 	
