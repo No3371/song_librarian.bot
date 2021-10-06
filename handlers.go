@@ -196,7 +196,7 @@ func pendEmbed (s *state.State, om *discord.Message, eIndex int, bId int) error 
 	// 	log.Printf("[Error] %s", fmt.Errorf("%w", err))
 	// 	return err
 	// }
-	logger.Logger.Infof("  Pending embed#%d...", eIndex)
+	logger.Logger.Infof("  Pending %d embed#%d...", om.ID, eIndex)
 	pendingEmbeds<-&pendingEmbed{
 		cId: botM.ChannelID,
 		msgID: botM.ID,
