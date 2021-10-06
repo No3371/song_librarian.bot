@@ -8,7 +8,7 @@ var regexCover_s0 = regexp2.MustCompile(`cover|うたてみた|うたってみ�
 var regexOriginal_s1 = regexp2.MustCompile(`original|オリジナル|原創|music video|full mv|mv|official|feat\.`, regexp2.IgnoreCase)
 var regexStream_s2 = regexp2.MustCompile(`sing|stream|歌枠(?!切り抜き)|歌回|うたう|歌う|歌います|歌配信|弾き語り|お歌|歌ったり`, regexp2.IgnoreCase)
 
-var regexClips = regexp2.MustCompile(`clip|切り抜き`, regexp2.IgnoreCase)
+var regexClips = regexp2.MustCompile(`clip|切り抜き|translate|translation|烤肉|翻譯|剪輯|切片`, regexp2.IgnoreCase)
 
 var regexUrlMapping = []*regexp2.Regexp {
 	regexYoutubeUrl_u0,

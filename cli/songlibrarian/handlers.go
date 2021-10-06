@@ -218,12 +218,17 @@ func pendEmbed (s *state.State, om *discord.Message, eIndex int, bId int) error 
 
 func guess (embed discord.Embed) (redirectType redirect.RedirectType, err error) {
 	defer func () {
-		if redirectType == redirect.None || redirectType == redirect.Unknown {
+		if redirectType == redirect.None || redirectType == redirect.Unknown || redirectType == redirect.Clip {
 			return
 		}
 
-		if addM, _ := regexClips.MatchString(embed.Title); addM {
+		if likeAClip, _ := regexClips.MatchString(embed.Title); likeAClip {
 			logger.Logger.Infof("  [GUESS] Wait! It looks like a clip!")
+			redirectType = redirect.Clip
+		}
+
+		if likeAClip, _ := regexClips.MatchString(embed.Author.Name); likeAClip {
+			logger.Logger.Infof("  [GUESS] Wait! The author looks like a clipping channel!")
 			redirectType = redirect.Clip
 		}
 	} ()
