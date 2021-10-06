@@ -100,18 +100,19 @@ func assureCommands (s *state.State) (err error) {
 			Type: discord.ChatInputCommand,
 			Name:        commandNameDelete,
 			Description: locale.C_DESC,
-			Options:     []discord.CommandOption{
-				{
-					Type:        discord.ChannelOption,
-					Name:        "cid",
-					Required:    true,
-				},
-				{
-					Type:        discord.IntegerOption,
-					Name:        "msgid",
-					Required:    true,
-				},
-			},
+			NoDefaultPermission: false,
+			// Options:     []discord.CommandOption{
+			// 	{
+			// 		Type:        discord.ChannelOption,
+			// 		Name:        "cid",
+			// 		Required:    true,
+			// 	},
+			// 	{
+			// 		Type:        discord.IntegerOption,
+			// 		Name:        "msgid",
+			// 		Required:    true,
+			// 	},
+			// },
 		})
 
 		if err != nil {
