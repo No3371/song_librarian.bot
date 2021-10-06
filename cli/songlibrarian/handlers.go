@@ -87,6 +87,10 @@ func onMessageCreated (s *state.State, m *discord.Message) (err error) {
 				<-fetchDelayTimer.C
 				fetchDelayTimer.Reset(time.Second * 3)
 				m, err = s.Message(m.ChannelID, m.ID)
+				if m == nil || err != nil {
+					logger.Logger.Errorf("The message is gone!? Abort!\n%v", err)
+					return
+				}
 				if len(m.Embeds) == 0 {
 					atomic.AddUint64(&statSession.ThirdFetchEmbeds0, 1)
 				}

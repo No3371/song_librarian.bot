@@ -176,8 +176,13 @@ func session (sCloser chan struct{}) (err error) {
 	
 	s.UpdateStatus(gateway.UpdateStatusData{
 		Since:      0,
-		Activities: nil,
-		Status:     discord.Status(locale.STATUS),
+		Activities: [] discord.Activity {
+			{
+				Name: locale.ACTIVITY,
+				Type: discord.ListeningActivity,
+			},
+		},
+		Status:     discord.OnlineStatus,
 		AFK:        false,
 	})
 
@@ -242,7 +247,6 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 					break loopBody
 				}
 
-				passed = time.Now().Sub(nextPending.pendedTime)
 				
 				botMsg, err = s.Message(nextPending.cId, nextPending.msgID)
 				if err != nil || botMsg == nil {
@@ -262,6 +266,8 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 						break
 					}
 				}
+
+				passed = time.Now().Sub(nextPending.pendedTime)
 			}
 			
 
@@ -431,7 +437,7 @@ func decideType (pending *pendingEmbed, botMsg *discord.Message) (rType redirect
 	}
 
 
-	logger.Logger.Infof("[LOG] O: %d, C: %d, S: %d, N: %d", c_o, c_c, c_s, c_n)
+	logger.Logger.Infof("  O: %d, C: %d, S: %d, N: %d", c_o, c_c, c_s, c_n)
 
 	sum := c_o + c_c + c_s
 	if sum == 0 || (c_n > c_o - 1 && c_n > c_c - 1 && c_n > c_s - 1) {
