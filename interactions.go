@@ -56,7 +56,7 @@ func addInteractionHandlers(s *state.State) {
 					} else {
 						logger.Logger.Infof("  Deleted.")
 						err = s.RespondInteraction(e.ID, e.Token, api.InteractionResponse{
-							Type: 0,
+							Type: api.MessageInteractionWithSource,
 							Data: &api.InteractionResponseData{
 								Content: option.NewNullableString("Deleted!"),
 							},
