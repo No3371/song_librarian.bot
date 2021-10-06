@@ -102,8 +102,7 @@ func main() {
 }
 
 func session (sCloser chan struct{}) (err error) {
-	var reconnects int
-	var selfCloser chan struct{} = make(chan struct{})
+	var sessionSelfCloser chan struct{} = make(chan struct{})
 	logger.Logger.Infof("[MAIN] Session is starting...")
 	sv, err = storage.Sqlite()
 	if err != nil {
@@ -120,7 +119,7 @@ func session (sCloser chan struct{}) (err error) {
 
 	pendingEmbeds = make(chan *pendingEmbed, 1024)
 
-	redirectorClosed := redirectorLoop(s, selfCloser)
+	redirectorClosed := redirectorLoop(s, sessionSelfCloser)
 
 	// err = assureCommands(s)
 	// if err != nil {
@@ -132,30 +131,41 @@ func session (sCloser chan struct{}) (err error) {
 
 	s.ErrorLog = func(innerErr error) {
 		logger.Logger.Errorf("[MAIN] Gateway error: %v", innerErr)
-		if err == gateway.ErrReconnectRequest && reconnects < 1 {
-			s.Reconnect()
-			reconnects++
-		} else {
-			err = innerErr
-			close(selfCloser)
+		err = innerErr
+		select {
+		case <-sessionSelfCloser:
+		default:
+			close(sessionSelfCloser)
 		}
 	}
 
 	s.FatalErrorCallback = func(innerErr error) {
 		logger.Logger.Errorf("[MAIN] Fatal gateway error: %v", err)
 		err = innerErr
-		close(selfCloser)
+		select {
+		case <-sessionSelfCloser:
+		default:
+			close(sessionSelfCloser)
+		}
 	}
 
 	s.AfterClose = func(innerErr error) {
 		logger.Logger.Errorf("[MAIN] After gateway closed: %v", err)
 		err = innerErr
-		close(selfCloser)
+		select {
+		case <-sessionSelfCloser:
+		default:
+			close(sessionSelfCloser)
+		}
 	}
 	
 	if err := s.Open(context.Background()); err != nil {
 		logger.Logger.Errorf("[MAIN] %v", err)
-		close(selfCloser)
+		select {
+		case <-sessionSelfCloser:
+		default:
+			close(sessionSelfCloser)
+		}
 	}
 	defer s.Close()
 
@@ -173,12 +183,12 @@ func session (sCloser chan struct{}) (err error) {
 
 	logger.Logger.Infof("====== %s at your service ======", u.Username)
 
-	promptClosed := startPromptLoop(s, selfCloser)
+	promptClosed := startPromptLoop(s, sessionSelfCloser)
 
 	select {
 	case <-sCloser:
-		close(selfCloser)
-	case <-selfCloser:
+		close(sessionSelfCloser)
+	case <-sessionSelfCloser:
 	}
 	select {
 	case <-promptClosed:

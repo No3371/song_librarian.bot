@@ -106,7 +106,9 @@ func handle (input string, s *state.State) (err error) {
 	case commandBindRemove:
 		err = unbind()
 	case commandBindQuery:
-		close(processCloser)
+		binding.IterateAllMapping(true, func(cId uint64, b *binding.ChannelBinding) {
+			logger.Logger.Infof("%d -> %+v", cId, b)
+		})
 		break
 	case commandExit:
 		close(processCloser)

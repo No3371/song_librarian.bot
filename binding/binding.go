@@ -207,8 +207,13 @@ func NewBinding () (bId int) {
 	return bId
 }
 
-func IterateAllBinding (iterator func (bId int, b *ChannelBinding)) {
-	for bId, b := range allBindings {
-		iterator(bId, b)
+func IterateAllMapping (loadAllBounds bool, iterator func (cId uint64, b *ChannelBinding)) {
+	for cId, bIds := range mapping {
+		for bId := range bIds {
+			if loadAllBounds {
+				b := QueryBinding(bId)
+				iterator(cId, b)
+			}
+		}
 	}
 }
