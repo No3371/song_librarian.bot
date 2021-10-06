@@ -17,6 +17,7 @@ var HELLO string
 var DETECTED string
 var DETECTED_MATCH_NONE string
 var DETECTED_UNKNOWN string
+var DETECTED_CLIPS string
 var BUTTON_ORIGINAL string
 var BUTTON_COVER string
 var BUTTON_NOT_SONG string
@@ -72,6 +73,7 @@ func SetLanguage (lang Locale) {
 		BUTTON_ORIGINAL = "原創"
 		BUTTON_COVER = "翻唱"
 		DETECTED = "偵測到內嵌連結：%s\n根據標題猜測為 **%s**，%d 分鐘後自動轉發\n可回應手動修正分類：🇴 原創 / 🇨 翻唱 / 🇸 歌回 / ❌ 不轉發"
+		DETECTED_CLIPS = "偵測到疑似🇴 **原創**：%s\n疑似剪輯❌**不轉發**。%d 分鐘內可回應手動分類：：🇴 原創 / 🇨 翻唱 / 🇸 歌回 / ❌ 不轉發"
 		DETECTED_MATCH_NONE = "偵測到內嵌連結：%s\n標題不含任何關鍵字，預設❌**不轉發**\n%d 分鐘內可回應手動修正分類：：🇴 原創 / 🇨 翻唱 / 🇸 歌回 / ❌ 不轉發"
 		DETECTED_UNKNOWN = "偵測到內嵌連結：%s\n猜測失敗❌**不轉發**。%d 分鐘內可回應手動分類：：🇴 原創 / 🇨 翻唱 / 🇸 歌回 / ❌ 不轉發"
 		FAILED_TO_GUESS = "[猜測失敗]"

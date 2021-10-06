@@ -135,7 +135,12 @@ func pendEmbed (s *state.State, om *discord.Message, eIndex int, bId int) error 
 	rType, err := guess(embed)
 	switch rType {
 	case redirect.Original:
-		sendMessageData.Content = fmt.Sprintf(locale.DETECTED, fmt.Sprintf("**%s** %s", embed.Author.Name, embed.Title), locale.ORIGINAL, (*globalFlags.delay).Minutes())
+		if addM, _ := regexClips.MatchString(embed.Title); addM {
+			sendMessageData.Content = fmt.Sprintf(locale.DETECTED_CLIPS, fmt.Sprintf("**%s** %s", embed.Author.Name, embed.Title), (*globalFlags.delay).Minutes())
+			rType = redirect.None
+		} else {
+			sendMessageData.Content = fmt.Sprintf(locale.DETECTED, fmt.Sprintf("**%s** %s", embed.Author.Name, embed.Title), locale.ORIGINAL, (*globalFlags.delay).Minutes())
+		}
 		break
 	case redirect.Cover:
 		sendMessageData.Content = fmt.Sprintf(locale.DETECTED, fmt.Sprintf("**%s** %s", embed.Author.Name, embed.Title), locale.COVER, (*globalFlags.delay).Minutes())
@@ -209,9 +214,9 @@ func pendEmbed (s *state.State, om *discord.Message, eIndex int, bId int) error 
 
 
 func guess (embed discord.Embed) (redirectType redirect.RedirectType, err error) {
-	var countOriginalKeywords = 0
-	var countCoverKeywords = 0
-	var countStreamKeywords = 0
+	var countO = 0
+	var countC = 0
+	var countS = 0
 
 	m, err := regexCover_s0.FindStringMatch(embed.Title)
 	if err != nil {
@@ -220,14 +225,14 @@ func guess (embed discord.Embed) (redirectType redirect.RedirectType, err error)
 	}
 
 	if m != nil {
-		countCoverKeywords ++
+		countC ++
 		for m != nil {
 			m, err = regexCover_s0.FindNextMatch(m)
 			if err != nil {
 				logger.Logger.Errorf("%s", err)
 				return redirect.Unknown, err
 			}
-			countCoverKeywords++
+			countC++
 		}
 	}
 
@@ -237,14 +242,14 @@ func guess (embed discord.Embed) (redirectType redirect.RedirectType, err error)
 		return redirect.Unknown, err
 	}
 	if m != nil {
-		countOriginalKeywords ++
+		countO ++
 		for m != nil {
 			m, err = regexOriginal_s1.FindNextMatch(m)
 			if err != nil {
 				logger.Logger.Errorf("%s", err)
 				return redirect.Unknown, err
 			}
-			countOriginalKeywords++
+			countO++
 		}
 	}
 
@@ -254,34 +259,37 @@ func guess (embed discord.Embed) (redirectType redirect.RedirectType, err error)
 		return redirect.Unknown, err
 	}
 	if m != nil {
-		countStreamKeywords ++
+		countS ++
 		for m != nil {
 			m, err = regexStream_s2.FindNextMatch(m)
 			if err != nil {
 				logger.Logger.Errorf("%s", err)
 				return redirect.Unknown, err
 			}
-			countStreamKeywords++
+			countS++
 		}
 	}
 
-	if countCoverKeywords + countOriginalKeywords + countStreamKeywords == 0 {
+	if countC + countO + countS == 0 {
 		return redirect.None, nil
 	}
 
-	if countCoverKeywords == countOriginalKeywords && countOriginalKeywords == countStreamKeywords {
+	if countC == countO && countO == countS {
 		return redirect.Unknown, nil
 	}
 
-	if countCoverKeywords > countOriginalKeywords && countCoverKeywords > countStreamKeywords {
+	if countC > countO && countC > countS {
 		return redirect.Cover, nil
 	}
 
-	if countOriginalKeywords > countCoverKeywords && countOriginalKeywords > countStreamKeywords {
+	if countO > countC && countO > countS {
+		if countC > 0 && countO < 3 {
+			return redirect.Cover, nil
+		}
 		return redirect.Original, nil
 	}
 
-	if countStreamKeywords > countOriginalKeywords && countStreamKeywords > countCoverKeywords {
+	if countS > countO && countS > countC {
 		return redirect.Stream, nil
 	}
 
