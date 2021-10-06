@@ -24,6 +24,7 @@ import (
 	"github.com/diamondburned/arikawa/v3/discord"
 	"github.com/diamondburned/arikawa/v3/gateway"
 	"github.com/diamondburned/arikawa/v3/state"
+	"github.com/pkg/errors"
 )
 
 
@@ -107,12 +108,12 @@ func session (sCloser chan struct{}) (err error) {
 	logger.Logger.Infof("[MAIN] Session is starting...")
 	sv, err = storage.Sqlite()
 	if err != nil {
-		log.Fatalf("Failed to get storage: %s", err)
+		return errors.Wrap(err, "Failed to get storage")
 	}
 
 	s, err := state.New("Bot " + *globalFlags.token)
 	if err != nil {
-		log.Fatalln("Session failed:", err)
+		return errors.Wrap(err, "Failed to get new bot state")
 	}
 
 	s.AddIntents(gateway.IntentGuildMessages)
@@ -196,6 +197,7 @@ func session (sCloser chan struct{}) (err error) {
 		close(sessionSelfCloser)
 	case <-sessionSelfCloser:
 	}
+	s.ErrorLog = nil
 	select {
 	case <-promptClosed:
 	case <-time.NewTimer(time.Second*5).C:
