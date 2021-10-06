@@ -334,7 +334,7 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 				logger.Logger.Errorf("F2: %s", err)
 			}
 	
-			atomic.AddUint64(&statSession.redirected, 1)
+			atomic.AddUint64(&statSession.Redirected, 1)
 
 			err = s.DeleteMessage(botMsg.ChannelID, botMsg.ID, "Temporary bot message")
 			if err != nil {

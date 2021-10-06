@@ -32,7 +32,7 @@ func addEventHandlers (s *state.State) {
 			return
 		}
 
-		atomic.AddUint64(&statSession.messageEvents, 1)
+		atomic.AddUint64(&statSession.MessageEvents, 1)
 
 		buffer<-item{
 			c: e.Message.ChannelID,
@@ -43,20 +43,20 @@ func addEventHandlers (s *state.State) {
 	go func () {
 		for {
 			it := <-buffer
-			atomic.AddUint64(&statSession.messageBuffered, 1)
+			atomic.AddUint64(&statSession.MessageBuffered, 1)
 			m, err := s.Message(it.c, it.m)
 			if m == nil || err != nil {
 				continue
 			}
 			if len(m.Embeds) == 0 {
-				atomic.AddUint64(&statSession.firstFetchEmbeds0, 1)
+				atomic.AddUint64(&statSession.FirstFetchEmbeds0, 1)
 			}
 			if time.Now().Sub(m.Timestamp.Time().Local()) < time.Second*3 {
 				<-fetchDelayTimer.C
 				fetchDelayTimer.Reset(time.Second * 3)
 				m, err = s.Message(it.c, it.m)
 				if len(m.Embeds) == 0 {
-					atomic.AddUint64(&statSession.secondFetchEmbeds0, 1)
+					atomic.AddUint64(&statSession.SecondFetchEmbeds0, 1)
 				}
 			}
 			err = onMessageCreated(s, m)
@@ -88,7 +88,7 @@ func onMessageCreated (s *state.State, m *discord.Message) (err error) {
 				fetchDelayTimer.Reset(time.Second * 3)
 				m, err = s.Message(m.ChannelID, m.ID)
 				if len(m.Embeds) == 0 {
-					atomic.AddUint64(&statSession.thirdFetchEmbeds0, 1)
+					atomic.AddUint64(&statSession.ThirdFetchEmbeds0, 1)
 				}
 			}
 			
@@ -101,17 +101,17 @@ func onMessageCreated (s *state.State, m *discord.Message) (err error) {
 			// For each binding, for each redirection, if the regex match...
 			for ei, e := range m.Embeds {
 				logger.Logger.Infof("Analyzing embed: %s (%s)", e.Title, e.URL)
-				atomic.AddUint64(&statSession.analyzedEmbeds, 1)
+				atomic.AddUint64(&statSession.AnalyzedEmbeds, 1)
 				urlMatching: for i := 0; i < urlRegexCount; i++ {
 					if b.UrlRegexEnabled(i) {
 						if isMatch, _ := regexUrlMapping[i].MatchString(e.URL); isMatch {
-							atomic.AddUint64(&statSession.urlRegexMatched, 1)
+							atomic.AddUint64(&statSession.UrlRegexMatched, 1)
 							logger.Logger.Infof("Binding#%d - UrlRegex#%d match!", bId, i)
 							if err := pendEmbed(s, m, ei, bId); err != nil {
 								logger.Logger.Errorf("%s", err)
 								continue
 							} else {
-								atomic.AddUint64(&statSession.pended, 1)
+								atomic.AddUint64(&statSession.Pended, 1)
 							}
 							break urlMatching
 						}
