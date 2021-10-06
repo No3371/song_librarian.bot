@@ -118,7 +118,7 @@ func session (sCloser chan struct{}) (err error) {
 	s.AddIntents(gateway.IntentGuildMessages)
 	s.AddIntents(gateway.IntentGuildMessageReactions)
 
-	pendingEmbeds = make(chan *pendingEmbed, 1024)
+	pendingEmbeds = make(chan *pendingEmbed, 512)
 
 	redirectorClosed := redirectorLoop(s, sessionSelfCloser)
 

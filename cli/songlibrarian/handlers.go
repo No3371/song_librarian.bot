@@ -24,7 +24,7 @@ var fetchDelayTimer *time.Timer = time.NewTimer(time.Second * 3)
 var buffer chan item
 
 func init () {
-	buffer = make(chan item, 64)
+	buffer = make(chan item, 128)
 }
 
 func addEventHandlers (s *state.State) {
