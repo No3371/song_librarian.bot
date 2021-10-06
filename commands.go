@@ -109,7 +109,7 @@ func assureCommands (s *state.State) (err error) {
 					Required:    true,
 				},
 				{
-					Type:        discord.IntegerOption,
+					Type:        discord.StringOption,
 					Name:        "m",
 					Description: "jibberish",
 					Required:    true,
