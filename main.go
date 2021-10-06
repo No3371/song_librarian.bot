@@ -107,7 +107,6 @@ func session (sCloser chan struct{}) (err error) {
 		log.Fatalln("Session failed:", err)
 	}
 
-	s.AddIntents(gateway.IntentDirectMessageReactions)
 	s.AddIntents(gateway.IntentGuildMessages)
 	s.AddIntents(gateway.IntentGuildMessageReactions)
 
@@ -115,13 +114,13 @@ func session (sCloser chan struct{}) (err error) {
 
 	redirectorClosed := redirectorLoop(s, sCloser)
 
-	err = assureCommands(s)
-	if err != nil {
-		logger.Logger.Fatalf("[MAIN] %v", err)
-	}
+	// err = assureCommands(s)
+	// if err != nil {
+	// 	logger.Logger.Fatalf("[MAIN] %v", err)
+	// }
 
 	addEventHandlers(s)
-	addInteractionHandlers(s)
+	// addInteractionHandlers(s)
 
 	s.FatalErrorCallback = func(innerErr error) {
 		logger.Logger.Errorf("[MAIN] Fatal gateway error: %s", err)
@@ -174,46 +173,46 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 			}
 			
 			
+			var botMsg *discord.Message
+			var originalMsg *discord.Message
+
 			passed := time.Now().Sub(nextPending.pendedTime)
 			delay := time.Duration(*globalFlags.delay) * time.Minute
 			if *globalFlags.dev {
 				delay = time.Second * 5
 			}
-			if (passed < delay) {
-				logger.Logger.Infof("Proceed in %s...", delay - passed)
-				for passed < delay {
-					t.Reset(time.Second * 10)
-					select {
-						case <-t.C:
-					case <-loopCloser:
-						break loopBody					
-					}
-					passed = time.Now().Sub(nextPending.pendedTime)
+			if (passed < delay && nextPending != nil) {
+				t.Reset(time.Second * 10)
+				select {
+					case <-t.C:
+				case <-loopCloser:
+					break loopBody
 				}
-				continue
+				passed = time.Now().Sub(nextPending.pendedTime)
+				
+				botMsg, err = s.Message(nextPending.cId, nextPending.msgID)
+				if err != nil || botMsg == nil {
+					// Failed to access the bot message, deleted?
+					logger.Logger.Errorf("Bot message inaccessible: %d", nextPending.msgID)
+					nextPending = nil
+					continue // cancel
+				} else {
+					if originalMsg, err = s.Message(botMsg.Reference.ChannelID, botMsg.Reference.MessageID); originalMsg == nil || err != nil {
+						logger.Logger.Errorf("Original message inaccessible: %d (error? %s)", botMsg.Reference.MessageID, err)
+						nextPending = nil
+						err = s.DeleteMessage(botMsg.ChannelID, botMsg.ID, "Temporary bot message")
+						if err != nil {
+							// Failed to remove the bot message...?
+							logger.Logger.Errorf("Failed to remove the bot message: %d", err)
+						}
+						continue // error skip
+					}
+				}
 			}
 	
-			var botMsg *discord.Message
-			botMsg, err = s.Message(nextPending.cId, nextPending.msgID)
-			if err != nil {
-				// Failed to access the bot message, deleted?
-				logger.Logger.Errorf("Bot message inaccessible: %d", nextPending.msgID)
-				nextPending = nil
-				continue // cancel
-			}
 	
 			// Check if the original message is not deleted
-			var originalMsg *discord.Message
-			if originalMsg, err = s.Message(botMsg.Reference.ChannelID, botMsg.Reference.MessageID); originalMsg == nil || err != nil {
-				logger.Logger.Errorf("Original message inaccessible: %d (error? %s)", botMsg.Reference.MessageID, err)
-				nextPending = nil
-				err = s.DeleteMessage(botMsg.ChannelID, botMsg.ID, "Temporary bot message")
-				if err != nil {
-					// Failed to remove the bot message...?
-					logger.Logger.Errorf("Failed to remove the bot message: %d", err)
-				}
-				continue // error skip
-			}
+
 		
 			var rType redirect.RedirectType
 			rType, err = decideType(nextPending, botMsg)

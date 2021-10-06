@@ -73,6 +73,12 @@ func onMessageCreated (s *state.State, m *discord.Message) (err error) {
 				logger.Logger.Errorf("A binding Id is pointing to nil Binding: %d", bId)
 				continue
 			}
+
+			if len(m.Embeds) == 0 {
+				<-fetchDelayTimer.C
+				fetchDelayTimer.Reset(time.Second * 3)
+				m, err = s.Message(m.ChannelID, m.ID)				
+			}
 			
 			// iErr := s.mes(*m, true)
 			// if iErr != nil {
