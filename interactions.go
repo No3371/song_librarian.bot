@@ -31,11 +31,11 @@ func addInteractionHandlers(s *state.State) {
 			var data = e.Data.(*discord.CommandInteractionData)
 			switch commandIdMap[data.ID] {
 			case DeleteRedirectedMessage:
-				logger.Logger.Infof("  DELETE (%s)", data.Name)
 				if len(data.Options) < 2 {
 					logger.Logger.Infof("Need 2 option values")
 					return
 				}
+				logger.Logger.Infof("  DELETE (%s): %s - %s", data.Name, data.Options[0], data.Options[1])
 				var cId uint64
 				var mId uint64
 				mId, err = strconv.ParseUint(data.Options[1].String(), 10, 64)
@@ -45,7 +45,8 @@ func addInteractionHandlers(s *state.State) {
 					return
 				}
 				var m *discord.Message
-				if m, err = s.Message(discord.ChannelID(cId), discord.MessageID(mId)); err != nil && m != nil && m.Author.ID == me.ID {
+				if m, err = s.Message(discord.ChannelID(cId), discord.MessageID(mId)); err == nil && m != nil && m.Author.ID == me.ID {
+					logger.Logger.Infof("  Message fetched and it's mine")
 					err = s.DeleteMessage(e.Message.ChannelID, e.Message.ID, "Requested")
 					if err != nil {
 						logger.Logger.Errorf("  DeleteMessage err: %v", err)
