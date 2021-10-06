@@ -103,7 +103,7 @@ func assureCommands (s *state.State) (err error) {
 			NoDefaultPermission: false,
 			Options:     []discord.CommandOption{
 				{
-					Type:        discord.ChannelOption,
+					Type:        discord.StringOption,
 					Name:        "c",
 					Description: "jibberish",
 					Required:    true,
