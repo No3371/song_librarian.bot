@@ -56,7 +56,7 @@ func addEventHandlers (s *state.State) {
 				fetchDelayTimer.Reset(time.Second * 3)
 				m, err = s.Message(it.c, it.m)
 				if len(m.Embeds) == 0 {
-					atomic.AddUint64(&statSession.firstFetchEmbeds0, 1)
+					atomic.AddUint64(&statSession.secondFetchEmbeds0, 1)
 				}
 			}
 			err = onMessageCreated(s, m)
