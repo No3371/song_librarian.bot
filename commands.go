@@ -107,8 +107,6 @@ func assureCommands (s *state.State) (err error) {
 					Required:    true,
 				},
 			},
-			NoDefaultPermission: false,
-			Type: discord.ChatInputCommand,
 		})
 
 		if err != nil {
