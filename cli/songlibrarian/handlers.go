@@ -14,6 +14,7 @@ import (
 	"github.com/diamondburned/arikawa/v3/discord"
 	"github.com/diamondburned/arikawa/v3/gateway"
 	"github.com/diamondburned/arikawa/v3/state"
+	"github.com/dlclark/regexp2"
 )
 type item struct {
 	c discord.ChannelID
@@ -230,65 +231,22 @@ func guess (embed discord.Embed) (redirectType redirect.RedirectType, err error)
 	var countC = 0
 	var countS = 0
 
-	m, err := regexCover_s0.FindStringMatch(embed.Title)
+	countC, err = countMatch("Cover   ", regexCover_s0, embed.Title)
 	if err != nil {
-		logger.Logger.Errorf("%s", err)
+		logger.Logger.Errorf("Failed to match for Cover keywords: %v", err)
 		return redirect.Unknown, err
 	}
 
-	if m != nil {
-		countC ++
-		logger.Logger.Infof("  [GUESS] Cover: %s (%d)", m.String(), countC)
-		for m != nil {
-			m, err = regexCover_s0.FindNextMatch(m)
-			if err != nil {
-				logger.Logger.Errorf("%s", err)
-				return redirect.Unknown, err
-			} else if m != nil {
-				logger.Logger.Infof("  [GUESS] Cover: %s (%d)", m.String(), countC)
-				countC++
-			}
-		}
-	}
-
-	m, err = regexOriginal_s1.FindStringMatch(embed.Title)
+	countO, err = countMatch("Original", regexOriginal_s1, embed.Title)
 	if err != nil {
-		logger.Logger.Errorf("%s", err)
+		logger.Logger.Errorf("Failed to match for Original keywords: %v", err)
 		return redirect.Unknown, err
 	}
-	if m != nil {
-		countO ++
-		logger.Logger.Infof("  [GUESS] Original: %s (%d)", m.String(), countO)
-		for m != nil {
-			m, err = regexOriginal_s1.FindNextMatch(m)
-			if err != nil {
-				logger.Logger.Errorf("%s", err)
-				return redirect.Unknown, err
-			} else if m != nil {
-				logger.Logger.Infof("  [GUESS] Original: %s (%d)", m.String(), countO)
-				countO++
-			}
-		}
-	}
 
-	m, err = regexStream_s2.FindStringMatch(embed.Title)
+	countS, err = countMatch("Stream  ", regexStream_s2, embed.Title)
 	if err != nil {
-		logger.Logger.Errorf("%s", err)
+		logger.Logger.Errorf("Failed to match for Stream keywords: %v", err)
 		return redirect.Unknown, err
-	}
-	if m != nil {
-		countS ++
-		logger.Logger.Infof("  [GUESS] Stream: %s (%d)", m.String(), countS)
-		for m != nil {
-			m, err = regexStream_s2.FindNextMatch(m)
-			if err != nil {
-				logger.Logger.Errorf("%s", err)
-				return redirect.Unknown, err
-			} else if m != nil {
-				logger.Logger.Infof("  [GUESS] Stream: %s (%d)", m.String(), countS)
-				countS++
-			}
-		}
 	}
 
 	logger.Logger.Infof("  [GUESS] o: %d / c: %d / s: %d", countO, countC, countS)
@@ -320,3 +278,25 @@ func guess (embed discord.Embed) (redirectType redirect.RedirectType, err error)
 }
 
 
+func countMatch (regexType string, r *regexp2.Regexp, subject string) (count int, err error) {
+	var m *regexp2.Match
+	m, err = r.FindStringMatch(subject)
+	if err != nil || m == nil {
+		return count, err
+	}
+
+	count ++
+	logger.Logger.Infof("    %s (%sx%d)", m.String(), regexType, count)
+	for m != nil {
+		m, err = r.FindNextMatch(m)
+		if err != nil {
+			logger.Logger.Errorf("%s", err)
+			return count, err
+		} else if m != nil {
+			logger.Logger.Infof("    %s (%sx%d)", m.String(), regexType, count)
+			count++
+		}
+	}
+
+	return count, err
+}
