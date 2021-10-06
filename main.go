@@ -186,7 +186,7 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 			var originalMsg *discord.Message
 
 			passed := time.Now().Sub(nextPending.pendedTime)
-			delay := time.Duration(*globalFlags.delay) * time.Minute
+			delay := *globalFlags.delay
 			if *globalFlags.dev {
 				delay = time.Second * 5
 			}
@@ -225,13 +225,28 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 				continue // cancel
 			}
 	
+			botMsg, err = s.Message(nextPending.cId, nextPending.msgID)
+			if err != nil || botMsg == nil {
+				// Failed to access the bot message, deleted?
+				logger.Logger.Errorf("Bot message inaccessible: %d", nextPending.msgID)
+				nextPending = nil
+				continue // cancel
+			} else {
+				if originalMsg, err = s.Message(botMsg.Reference.ChannelID, botMsg.Reference.MessageID); originalMsg == nil || err != nil {
+					logger.Logger.Errorf("Original message inaccessible: %d (error? %s)", botMsg.Reference.MessageID, err)
+					nextPending = nil
+					err = s.DeleteMessage(botMsg.ChannelID, botMsg.ID, "Temporary bot message")
+					if err != nil {
+						// Failed to remove the bot message...?
+						logger.Logger.Errorf("Failed to remove the bot message: %d", err)
+					}
+					continue // error skip
+				}
+			}
 	
 			// Check if the original message is not deleted
-
-		
 			var isAuto bool
 			var rType redirect.RedirectType
-			rType, err = decideType(nextPending, botMsg)
 			rType, isAuto, err = decideType(nextPending, botMsg)
 			if err != nil {
 				// Failed to remove the bot message...?
