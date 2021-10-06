@@ -121,7 +121,7 @@ func handle (input string, s *state.State) (err error) {
 		break
 	case "stats":
 		var j []byte
-		j, err = json.Marshal(statSession)
+		j, err = json.Marshal(*statSession)
 		if err != nil {
 			j = []byte("Failed to unmarshal")
 		}
