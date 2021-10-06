@@ -236,6 +236,8 @@ func guess (embed discord.Embed) (redirectType redirect.RedirectType, err error)
 	var countC = 0
 	var countS = 0
 
+	logger.Logger.Infof("  [GUESS]")
+
 	countC, err = countMatch("Cover   ", regexCover_s0, embed.Title)
 	if err != nil {
 		logger.Logger.Errorf("Failed to match for Cover keywords: %v", err)
