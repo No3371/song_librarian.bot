@@ -97,17 +97,18 @@ func assureCommands (s *state.State) (err error) {
 	if cmd, exist := required[commandNameDelete]; !exist {
 		logger.Logger.Infof("[LOG] Creating command: %s", commandNameDelete)
 		cmdR, err := s.CreateCommand(_appid, api.CreateCommandData{
+			Type: discord.ChatInputCommand,
 			Name:        commandNameDelete,
 			Description: locale.C_DESC,
 			Options:     []discord.CommandOption{
 				{
 					Type:        discord.ChannelOption,
-					Name:        "c_id",
+					Name:        "cid",
 					Required:    true,
 				},
 				{
 					Type:        discord.IntegerOption,
-					Name:        "msg_id",
+					Name:        "msgid",
 					Required:    true,
 				},
 			},
