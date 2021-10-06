@@ -7,9 +7,11 @@ import (
 	"strconv"
 
 	"No3371.github.com/song_librarian.bot/logger"
+	"github.com/diamondburned/arikawa/v3/api"
 	"github.com/diamondburned/arikawa/v3/discord"
 	"github.com/diamondburned/arikawa/v3/gateway"
 	"github.com/diamondburned/arikawa/v3/state"
+	"github.com/diamondburned/arikawa/v3/utils/json/option"
 )
 
 func assureInteractions (s *state.State) {
@@ -46,11 +48,23 @@ func addInteractionHandlers(s *state.State) {
 				}
 				var m *discord.Message
 				if m, err = s.Message(discord.ChannelID(cId), discord.MessageID(mId)); err == nil && m != nil && m.Author.ID == me.ID {
-					logger.Logger.Infof("  Message fetched and it's mine")
-					err = s.DeleteMessage(e.Message.ChannelID, e.Message.ID, "Requested")
+					logger.Logger.Infof("  Message fetched and it's mine.")
+					err = s.DeleteMessage(m.ChannelID, m.ID, "Requested")
 					if err != nil {
 						logger.Logger.Errorf("  DeleteMessage err: %v", err)
 						return
+					} else {
+						logger.Logger.Infof("  Deleted.")
+						err = s.RespondInteraction(e.ID, e.Token, api.InteractionResponse{
+							Type: 0,
+							Data: &api.InteractionResponseData{
+								Content: option.NewNullableString("Deleted!"),
+							},
+						})
+						if err != nil {
+							logger.Logger.Errorf("  Failed to respond: %v", err)
+							return
+						}
 					}
 				}
 				break
