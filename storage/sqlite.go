@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 
 	"No3371.github.com/song_librarian.bot/logger"
 	_ "github.com/mattn/go-sqlite3"
@@ -387,6 +388,140 @@ func (s *sqlite) GetBindingCount () (count int, err error) {
 
 }
 
+func (s *sqlite) SaveCommandId(defId int, cmdId uint64) (err error) {
+	var tx *sql.Tx
+	tx, err = s.BeginTx(context.Background(), &sql.TxOptions{
+		Isolation: 0,
+		ReadOnly:  false,
+	})
+	defer func () {
+		if err != nil {
+			tx.Rollback()
+			logger.Logger.Errorf("[DB] Rollback: %s", err)
+		} else {
+			err = tx.Commit()
+			if err != nil {
+				tx.Rollback()
+				logger.Logger.Errorf("[DB] Rollback: %s", err)
+			}
+		}
+	} ()
+	if err != nil {
+		return err
+	}
+
+	query := fmt.Sprintf(
+	`
+	SELECT CD
+	FROM Commands
+	WHERE CD = %d;
+	`, defId)
+
+	var rows *sql.Rows
+	rows, err = s.Query(query)
+	if err != nil {
+		return err
+	}
+	
+	var exists = true
+	if !rows.Next() {
+		// Need to create
+		exists = false
+	}
+	err = rows.Err()
+	if err != nil {
+		return err
+	}
+	rows.Close()
+
+
+	if exists {
+		stmt := fmt.Sprintf(
+		`
+		UPDATE Commands
+		SET CD = %d, CMD_ID = '%s'
+		WHERE CD = %d;
+		`, defId, strconv.FormatUint(cmdId, 10), defId)
+		
+		_, err = tx.Exec(stmt)
+		if err != nil {
+			return err
+		}
+	} else {
+		stmt := fmt.Sprintf(
+		`
+		INSERT INTO Commands (CD, CMD_ID)
+		VALUES (%d, '%s');
+		`, defId, strconv.FormatUint(cmdId, 10))
+		
+		_, err = tx.Exec(stmt)
+		if err != nil {
+			return err
+		}
+
+	}
+
+	return nil
+}
+
+func (s *sqlite) LoadCommandId(defId int) (cmdId uint64, err error) {
+	var tx *sql.Tx
+	tx, err = s.BeginTx(context.Background(), &sql.TxOptions{
+		Isolation: 0,
+		ReadOnly:  true,
+	})
+	defer func () {
+		if err != nil {
+			tx.Rollback()
+			logger.Logger.Errorf("[DB] Rollback: %s", err)
+		} else {
+			err = tx.Commit()
+			if err != nil {
+				tx.Rollback()
+				logger.Logger.Errorf("[DB] Rollback: %s", err)
+			}
+		}
+	} ()
+	query := fmt.Sprintf(
+	`
+	SELECT CMD_ID
+	FROM Commands
+	WHERE CD = %d;
+	`, defId)
+
+	var rows *sql.Rows
+	rows, err = tx.Query(query)
+	if err != nil {
+		return 0, err
+	}
+
+	var j string
+	
+	for rows.Next() {
+		err = rows.Scan(&j)
+		if err != nil {
+			return 0, err
+		}
+	}
+	err = rows.Err()
+	if err != nil {
+		return 0, err
+	}
+	rows.Close()
+
+	if j == "" {
+		return 0, err
+	}
+
+	cmdId, err = strconv.ParseUint(j, 10, 64)
+	if err != nil {
+		return 0, err
+	}
+	
+	return cmdId, nil
+}
+
+
 type sqlite struct {
 	*sql.DB
 }
@@ -398,24 +533,36 @@ func Sqlite () (sv *sqlite, err error) {
 		return nil, err
 	}
 
+	var tableCommandsFound, tableMappingsFound, tableBindingsFound bool
+
 	var r *sql.Rows
 	r, err = s.Query(`
-	SELECT Count(*) FROM sqlite_master WHERE type='table' AND (name='Bindings' OR name='Mappings');
+	SELECT name FROM sqlite_master WHERE type='table';
 	`)
 	if err != nil {
 		logger.Logger.Fatalf("%s", err)
 	}
 
-	var count int
+	var tName string
 	func () {
 		defer r.Close()
-		if r.Next() {
-			err = r.Scan(&count)
+		for r.Next() {
+			err = r.Scan(&tName)
 			if err != nil {
 				logger.Logger.Fatalf("%s", err)
 			}
-		} else {
-			logger.Logger.Fatalf("sqlite: Failed to get count")
+			// logger.Logger.Infof("[Storage] %s", tName)
+			switch tName {
+			case "Mappings":
+				tableMappingsFound = true
+				break
+			case "Bindings":
+				tableBindingsFound = true
+				break
+			case "Commands":
+				tableCommandsFound = true
+				break
+			}
 		}
 	} ()
 
@@ -423,16 +570,7 @@ func Sqlite () (sv *sqlite, err error) {
 		s,
 	}
 
-	if count == 0 {
-		err = sv.tx(`
-		CREATE TABLE Bindings (
-			B_ID int,
-			Json string
-		)
-		`)
-		if err != nil {
-			logger.Logger.Fatalf("[Storage] Failed to create table of Bindings: %s", err)
-		}
+	if !tableMappingsFound {
 		err = sv.tx(`
 		CREATE TABLE Mappings (
 			C_ID string,
@@ -440,13 +578,43 @@ func Sqlite () (sv *sqlite, err error) {
 		)
 		`)
 		if err != nil {
-			logger.Logger.Fatalf("[Storage] Failed to create table of Mapping: %s", err)
+			logger.Logger.Fatalf("[Storage] Failed to create table \"Mappings\": %s", err)
+		} else {
+			logger.Logger.Infof("[Storage] Created table \"Mappings\".")
 		}
-	} else if count != 2 {
-		logger.Logger.Fatalf("[Storage] Did not found exactly 2 tables (Mappings & Bindings)")
+	}
+	
+	if !tableBindingsFound {
+		err = sv.tx(`
+		CREATE TABLE Bindings (
+			B_ID int,
+			Json string
+		)
+		`)
+		if err != nil {
+			logger.Logger.Fatalf("[Storage] Failed to create table \"Bindings\": %s", err)
+		} else {
+			logger.Logger.Infof("[Storage] Created table \"Bindings\".")
+		}
 	}
 
-	return sv, nil
+	if !tableCommandsFound {
+		err = sv.tx(`
+		CREATE TABLE Commands (
+			CD int,
+			CMD_ID string
+		)
+		`)
+		if err != nil {
+			logger.Logger.Fatalf("[Storage] Failed to create table \"Commands\": %s", err)
+		} else {
+			logger.Logger.Infof("[Storage] Created table \"Commands\".")
+		}
+	}
+
+	
+
+	return sv, err
 }
 
 func (s *sqlite) tx (stmt string) error {

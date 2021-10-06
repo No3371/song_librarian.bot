@@ -4,6 +4,9 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"runtime"
+	"runtime/pprof"
+
 	// "os/signal"
 	// "syscall"
 
@@ -37,12 +40,24 @@ type pendingEmbed struct {
 
 
 var processCloser chan struct{}
-
 func main() {
 	var err error
 	resolveFlags()
 	locale.SetLanguage(locale.FromString(*globalFlags.locale))
 
+	if *globalFlags.dev {
+        f, err := os.Create("./cpuprof")
+        if err != nil {
+            logger.Logger.Fatalf("could not create CPU profile: ", err)
+        }
+        defer f.Close() // error handling omitted for example
+		logger.Logger.Infof("Starting cpu profiling...")
+		runtime.SetCPUProfileRate(200)
+        if err := pprof.StartCPUProfile(f); err != nil {
+            logger.Logger.Fatalf("could not start CPU profile: ", err)
+        }
+        defer pprof.StopCPUProfile()
+    }
 	// sigs := make(chan os.Signal, 1)
 
     // signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
@@ -92,6 +107,7 @@ func session (sCloser chan struct{}) (err error) {
 		log.Fatalln("Session failed:", err)
 	}
 
+	s.AddIntents(gateway.IntentDirectMessageReactions)
 	s.AddIntents(gateway.IntentGuildMessages)
 	s.AddIntents(gateway.IntentGuildMessageReactions)
 
@@ -99,12 +115,13 @@ func session (sCloser chan struct{}) (err error) {
 
 	redirectorClosed := redirectorLoop(s, sCloser)
 
-	// err = assureCommands(s)
-	// if err != nil {
-	// 	logger.Logger.Fatalf("[MAIN] %v", err)
-	// }
+	err = assureCommands(s)
+	if err != nil {
+		logger.Logger.Fatalf("[MAIN] %v", err)
+	}
 
-	addHandlers(s)
+	addEventHandlers(s)
+	addInteractionHandlers(s)
 
 	s.FatalErrorCallback = func(innerErr error) {
 		logger.Logger.Errorf("[MAIN] Fatal gateway error: %s", err)
@@ -164,11 +181,14 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 			}
 			if (passed < delay) {
 				logger.Logger.Infof("Proceed in %s...", delay - passed)
-				t.Reset(delay - passed)
-				select {
-					case <-t.C:
-				case <-loopCloser:
-					break loopBody					
+				for passed < delay {
+					t.Reset(time.Second * 10)
+					select {
+						case <-t.C:
+					case <-loopCloser:
+						break loopBody					
+					}
+					passed = time.Now().Sub(nextPending.pendedTime)
 				}
 				continue
 			}
@@ -227,7 +247,7 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 			logger.Logger.Infof("[REDIRECT] Redirecting to channel %d", destCId)
 	
 			data := api.SendMessageData{
-				Content:    "ｷﾀ━━ｷﾀ━━ｷﾀ──────────==========≡≡≡≡≡Σ≡Σ(((つ•̀ㅂ•́)و *✧*✧*✧ ",
+				Content:    "ｷﾀ━━ｷﾀ━━ｷﾀ──────────==========≡≡≡≡≡Σ≡Σ(((つ•̀ㅂ•́)و \\*✧\\*✧\\*✧ ",
 				Embeds:     []discord.Embed{
 					{
 						Type: discord.NormalEmbed,

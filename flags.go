@@ -1,6 +1,8 @@
 package main
 
 import (
+	"time"
+
 	"No3371.github.com/song_librarian.bot/logger"
 	flag "github.com/spf13/pflag"
 )
@@ -10,7 +12,7 @@ type flags struct {
 	appid *int64
 	token *string
 	locale *string
-	delay *int
+	delay *time.Duration
 	controlPort *uint16
 }
 
@@ -24,7 +26,7 @@ func resolveFlags () {
 	globalFlags.appid = flag.Int64("appid", 0, "discord app id")
 	globalFlags.token = flag.String("token", "", "discord bot token")
 	globalFlags.locale = flag.String("locale", "TW", "locale code")
-	globalFlags.delay = flag.Int("delay", 5, "")
+	globalFlags.delay = flag.Duration("delay", time.Minute, "")
 	globalFlags.controlPort = flag.Uint16("cport", 11813, "")
 
 	flag.Parse()

@@ -7,4 +7,5 @@ const (
 	reactionNone = "❌"
 
 	commandNameChannel = "channel"
+	commandNameDelete = "delete"
 )

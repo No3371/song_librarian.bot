@@ -1,0 +1,6 @@
+﻿Windows
+.vscode
+db
+*.exe
+cpuprof
+trace

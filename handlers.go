@@ -25,11 +25,12 @@ func init () {
 	buffer = make(chan item, 64)
 }
 
-func addHandlers (s *state.State) {
+func addEventHandlers (s *state.State) {
 	s.AddHandler(func (e *gateway.MessageCreateEvent) {
 		if e.Author.Bot {
 			return
 		}
+
 
 		buffer<-item{
 			c: e.Message.ChannelID,
@@ -55,6 +56,7 @@ func addHandlers (s *state.State) {
 			}
 		}
 	}()
+
 }
 
 func onMessageCreated (s *state.State, m *discord.Message) (err error) {
@@ -152,12 +154,26 @@ func pendEmbed (s *state.State, om *discord.Message, eIndex int, bId int) error 
 	// }
 	
 	// logger.Logger.Infof("  Reacting...")
-	// err = s.React(botM.ChannelID, botM.ID, discord.APIEmoji(reaction))
+	// err = s.React(botM.ChannelID, botM.ID, discord.APIEmoji(reactionOriginal))
 	// if err != nil {
 	// 	log.Printf("[Error] %s", fmt.Errorf("%w", err))
 	// 	return err
 	// }
-
+	// err = s.React(botM.ChannelID, botM.ID, discord.APIEmoji(reactionCover))
+	// if err != nil {
+	// 	log.Printf("[Error] %s", fmt.Errorf("%w", err))
+	// 	return err
+	// }
+	// err = s.React(botM.ChannelID, botM.ID, discord.APIEmoji(reactionStream))
+	// if err != nil {
+	// 	log.Printf("[Error] %s", fmt.Errorf("%w", err))
+	// 	return err
+	// }
+	// err = s.React(botM.ChannelID, botM.ID, discord.APIEmoji(reactionNone))
+	// if err != nil {
+	// 	log.Printf("[Error] %s", fmt.Errorf("%w", err))
+	// 	return err
+	// }
 	logger.Logger.Infof("  Pending embed#%d...", eIndex)
 	pendingEmbeds<-&pendingEmbed{
 		cId: botM.ChannelID,
@@ -251,3 +267,5 @@ func guess (embed discord.Embed) (redirectType redirect.RedirectType, err error)
 
 	return redirect.Unknown, nil
 }
+
+

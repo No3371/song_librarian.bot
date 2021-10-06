@@ -25,6 +25,7 @@ var REDIRECT_FORMAT string
 var C_DESC string
 var C_ORIGINAL_DESC string
 var C_COVER_DESC string
+var C_DELETE_ID_DESC string
 
 var ORIGINAL string
 var COVER    string
