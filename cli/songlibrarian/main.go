@@ -37,7 +37,7 @@ type pendingEmbed struct {
 	embedIndex int
 	urlValidation string
 	bindingId int
-	pendedTime time.Time
+	createdTime time.Time
 	guess redirect.RedirectType
 }
 
@@ -215,139 +215,123 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 	loopDone = make(chan struct{})
 	go func () {
 		logger.Logger.Infof("[MAIN] Redirector is starting...")
-		var err error
 		t := time.NewTimer(time.Minute)
-		var nextPending *pendingEmbed
-		loopBody: for {
-			if nextPending == nil {
-				select {
-					case nextPending = <-pendingEmbeds: // block until new pending
-				case <-loopCloser:
-					break loopBody					
+
+		processRedirect := func (p *pendingEmbed) (err error){
+			defer func () {
+				if err == nil {
+					if pErr := recover(); pErr != nil {
+						err = pErr.(error)
+					}
 				}
-			}
-			logger.Logger.Infof("Redirector: new task.")
-			
+			} ()
+			logger.Logger.Infof("Redirector: new task.")			
 			
 			var botMsg *discord.Message
 			var originalMsg *discord.Message
 
-			passed := time.Now().Sub(nextPending.pendedTime)
+			if p == nil {
+				panic("nil pended?")
+			}
+	
+			passed := time.Now().Sub(p.createdTime)
 			delay := *globalFlags.delay
 			
 			if *globalFlags.dev {
 				delay = time.Second * 5
 			}
 
-			if nextPending == nil {
-				panic("nil pended?")
-			}
-			for passed < delay && nextPending != nil {
+
+			for passed < delay {
 				t.Reset(time.Second * 10)
 				select {
 					case <-t.C:
 				case <-loopCloser:
-					break loopBody
+					return nil
 				}
 
 				
-				botMsg, err = s.Message(nextPending.cId, nextPending.msgID)
+				botMsg, err = s.Message(p.cId, p.msgID)
 				if err != nil || botMsg == nil {
 					// Failed to access the bot message, deleted?
-					logger.Logger.Errorf("Bot message inaccessible: %d", nextPending.msgID)
-					nextPending = nil
-					break
+					logger.Logger.Errorf("Bot message inaccessible: %d", p.msgID)
+					return
 				} else {
 					if originalMsg, err = s.Message(botMsg.Reference.ChannelID, botMsg.Reference.MessageID); originalMsg == nil || err != nil {
-						logger.Logger.Errorf("Original message inaccessible")
-						nextPending = nil
+						logger.Logger.Errorf("Original message inaccessible (error? %v", err)
 						err = s.DeleteMessage(botMsg.ChannelID, botMsg.ID, "Temporary bot message")
 						if err != nil {
 							// Failed to remove the bot message...?
 							logger.Logger.Errorf("Failed to remove the bot message: %d", err)
 						}
-						break
 					}
+					return
 				}
 
-				passed = time.Now().Sub(nextPending.pendedTime)
+				passed = time.Now().Sub(p.createdTime)
 			}
 			
 
 			// Do it again because passed < delay may not always be true
-			botMsg, err = s.Message(nextPending.cId, nextPending.msgID)
+			botMsg, err = s.Message(p.cId, p.msgID)
 			if err != nil || botMsg == nil {
 				// Failed to access the bot message, deleted?
-				logger.Logger.Errorf("Bot message inaccessible: %d", nextPending.msgID)
-				nextPending = nil
+				logger.Logger.Errorf("Bot message inaccessible: %d", p.msgID)
+				return
 			} else {
 				if originalMsg, err = s.Message(botMsg.Reference.ChannelID, botMsg.Reference.MessageID); originalMsg == nil || err != nil {
-					logger.Logger.Errorf("Original message inaccessible: %d (error? %s)", botMsg.Reference.MessageID, err)
-					nextPending = nil
-					err = s.DeleteMessage(botMsg.ChannelID, botMsg.ID, "Temporary bot message")
-					if err != nil {
-						// Failed to remove the bot message...?
-						logger.Logger.Errorf("Failed to remove the bot message: %d", err)
-					}
-				} else if originalMsg.Embeds == nil || len(originalMsg.Embeds) == 0 {
-					logger.Logger.Infof("[!] Original message has no embeds...? Abort!")
-					nextPending = nil
+					logger.Logger.Errorf("Original message inaccessible (error? %v", err)
 					err = s.DeleteMessage(botMsg.ChannelID, botMsg.ID, "Temporary bot message")
 					if err != nil {
 						// Failed to remove the bot message...?
 						logger.Logger.Errorf("Failed to remove the bot message: %d", err)
 					}
 				}
-			}
-
-			if nextPending == nil {
-				continue // cancel
+				return
 			}
 	
 			// Check if the original message is not deleted
 			var isAuto, isGuessCorrect bool
 			var rType redirect.RedirectType
-			rType, isAuto, err = decideType(nextPending, botMsg)
+			rType, isAuto, err = decideType(p, botMsg)
 			if err != nil {
 				// Failed to remove the bot message...?
 				logger.Logger.Errorf("Failed to decide type: %v", err)
 			}
 
-			if rType == nextPending.guess {
+			if rType == p.guess {
 				isGuessCorrect = true
 			}
 			
 			if rType == redirect.None {
-				nextPending = nil
 				err = s.DeleteMessage(botMsg.ChannelID, botMsg.ID, "Temporary bot message")
 				if err != nil {
 					// Failed to remove the bot message...?
 					logger.Logger.Errorf("Failed to remove the bot message: %v", err)
 				}
-				continue
+				return
 			}
 	
-			destCId, bound := binding.QueryBinding(nextPending.bindingId).DestChannelId(rType)
+			destCId, bound := binding.QueryBinding(p.bindingId).DestChannelId(rType)
 			if !bound {
 				logger.Logger.Infof("[MAIN] No destination bound to %v", rType)
-				nextPending = nil
 				err = s.DeleteMessage(botMsg.ChannelID, botMsg.ID, "Temporary bot message")
 				if err != nil {
 					// Failed to remove the bot message...?
 					logger.Logger.Errorf("Failed to remove the bot message: %d", err)
 				}
-				continue // cancel
+				return
 			}
 
 			logger.Logger.Infof("  Redirecting to channel %d", destCId)
 			
 			var data *api.SendMessageData
-			data, err = prepareRedirectionMessage(originalMsg, nextPending, isAuto, isGuessCorrect)
+			data, err = prepareRedirectionMessage(originalMsg, p, isAuto, isGuessCorrect)
 			if err != nil {
 				logger.Logger.Errorf("Failed to prepare redirection message!\n%v", err)
 			}
 	
-			_, err := s.SendMessageComplex(
+			_, err = s.SendMessageComplex(
 				discord.ChannelID(destCId), *data,
 			)
 	
@@ -355,7 +339,7 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 				logger.Logger.Errorf("F1: %s", err)
 			}
 	
-			_, err = s.SendMessage(discord.ChannelID(destCId), fmt.Sprintf("%s %s", originalMsg.Embeds[nextPending.embedIndex].URL, locale.EXPLAIN_EMBED_RESOLVE))
+			_, err = s.SendMessage(discord.ChannelID(destCId), fmt.Sprintf("%s %s", originalMsg.Embeds[p.embedIndex].URL, locale.EXPLAIN_EMBED_RESOLVE))
 	
 			if err != nil {
 				logger.Logger.Errorf("F2: %s", err)
@@ -369,7 +353,24 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 				logger.Logger.Errorf("Failed to remove the bot message: %d", err)
 			}
 	
-			nextPending = nil
+			return nil
+		}
+		rLoop: for {
+			select {
+			case p := <-pendingEmbeds: // block until new pending
+				if rErr := processRedirect(p); rErr != nil {
+					logger.Logger.Infof("Redirector task with: %v", rErr)
+				}
+				select {
+				case <-loopCloser:
+					break rLoop
+				default:
+				}
+				break
+			case <-loopCloser:
+				break rLoop
+			}
+
 		}
 		close(loopDone)
 		logger.Logger.Infof("[MAIN] Redirector is ended.")
