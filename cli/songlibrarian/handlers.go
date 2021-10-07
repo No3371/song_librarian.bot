@@ -293,15 +293,15 @@ func countMatch (regexType string, r *regexp2.Regexp, subject string) (count int
 	}
 
 	count ++
-	logger.Logger.Infof("    %s (%sx%d)", m.String(), regexType, count)
+	logger.Logger.Infof("    %s\n      %s)", regexType, m.String())
 	for m != nil {
 		m, err = r.FindNextMatch(m)
 		if err != nil {
 			logger.Logger.Errorf("%s", err)
 			return count, err
 		} else if m != nil {
-			logger.Logger.Infof("    %s (%sx%d)", m.String(), regexType, count)
 			count++
+			logger.Logger.Infof("      %s", m.String())
 		}
 	}
 

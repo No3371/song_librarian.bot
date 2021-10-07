@@ -24,5 +24,5 @@ func (s *stats) Print() {
 	if err != nil {
 		j = []byte("Failed to marshal")
 	}
-	fmt.Printf("\n[STATS] Redirect rate: %0.2f%%\n%s\n", float64(statSession.Redirected)/float64(statSession.AnalyzedEmbeds), string(j))
+	fmt.Printf("\n[STATS] Redirect rate: %0.2f%%\n%s\n", 100*(float64(statSession.Redirected)/float64(statSession.AnalyzedEmbeds)), string(j))
 }
