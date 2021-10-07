@@ -386,7 +386,7 @@ func prepareRedirectionMessage (originalMsg *discord.Message, nextPending *pendi
 		}
 	} ()
 	return  &api.SendMessageData{
-		Content:    "ｷﾀ━━ｷﾀ━━ｷﾀ──────────==========≡≡≡≡≡Σ≡Σ(((つ•̀ㅂ•́)و \\*✧\\*✧\\*✧ ",
+		Content:    "ｷﾀｷﾀ────=====≡≡Σ≡Σ(((つ•̀ㅂ•́)و \\*✧\\*✧\\*✧ ",
 		Embeds:     []discord.Embed{
 			{
 				Type: discord.NormalEmbed,
