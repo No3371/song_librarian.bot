@@ -3,7 +3,6 @@ package main
 import (
 	"time"
 
-	"No3371.github.com/song_librarian.bot/logger"
 	flag "github.com/spf13/pflag"
 )
 
@@ -32,6 +31,4 @@ func resolveFlags () {
 	globalFlags.controlPort = flag.Uint16("cport", 11813, "")
 
 	flag.Parse()
-	
-	logger.Logger.Infof("Flags resolved: %+v", globalFlags)
 }
