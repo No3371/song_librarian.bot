@@ -293,8 +293,8 @@ func countMatch (regexType string, r *regexp2.Regexp, subject string) (count int
 	}
 
 	count ++
-	logger.Logger.Infof("    %s)", regexType)
-	logger.Logger.Infof("      %s)", m.String())
+	logger.Logger.Infof("    %s", regexType)
+	logger.Logger.Infof("      %s", m.String())
 	for m != nil {
 		m, err = r.FindNextMatch(m)
 		if err != nil {
