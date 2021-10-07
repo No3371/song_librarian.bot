@@ -264,8 +264,8 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 							// Failed to remove the bot message...?
 							logger.Logger.Errorf("Failed to remove the bot message: %d", err)
 						}
+						return
 					}
-					return
 				}
 
 				passed = time.Now().Sub(p.createdTime)
