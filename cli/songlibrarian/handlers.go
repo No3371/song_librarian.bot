@@ -97,6 +97,9 @@ func onMessageCreated (s *state.State, m *discord.Message) (err error) {
 				}
 			}
 			
+			if len(m.Embeds) > 0 {
+				atomic.AddUint64(&statSession.FetchedAndAnalyzed, 1)
+			}
 			// iErr := s.mes(*m, true)
 			// if iErr != nil {
 			// 	logger.Logger.Infof("[HANDLER] MessageCreateEvent: Update failed: %v", err)

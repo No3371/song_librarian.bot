@@ -11,6 +11,7 @@ type stats struct {
 	FirstFetchEmbeds0  uint64
 	SecondFetchEmbeds0 uint64
 	ThirdFetchEmbeds0  uint64
+	FetchedAndAnalyzed  uint64
 	AnalyzedEmbeds     uint64
 	UrlRegexMatched    uint64
 	Pended             uint64
