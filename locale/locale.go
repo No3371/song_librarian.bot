@@ -86,7 +86,7 @@ func SetLanguage (lang Locale) {
 		SHARER = "分享者"
 		SDTYPE = "判定"
 		SDTYPE_AUTO = "機器人🤖"
-		SDTYPE_MANUAL = "投票確認✔️"
+		SDTYPE_MANUAL = "投票確認☑️"
 		SDTYPE_MANUAL_CORRECTION = "投票修正🗳️"
 		SMSG = "原文"
 		EXPLAIN_EMBED_RESOLVE = "（內嵌播放）"
