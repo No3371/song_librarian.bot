@@ -46,7 +46,7 @@ var processCloser chan struct{}
 func main() {
 	var err error
 	resolveFlags()
-	logger.SetupLogger(*globalFlags.dev)
+	logger.SetupLogger(!*globalFlags.dev)
 	locale.SetLanguage(locale.FromString(*globalFlags.locale))
 	statSession = &stats{}
 
