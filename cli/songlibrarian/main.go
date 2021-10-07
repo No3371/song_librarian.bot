@@ -46,6 +46,7 @@ var processCloser chan struct{}
 func main() {
 	var err error
 	resolveFlags()
+	logger.SetupLogger(*globalFlags.dev)
 	locale.SetLanguage(locale.FromString(*globalFlags.locale))
 	statSession = &stats{}
 
@@ -225,7 +226,7 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 					}
 				}
 			} ()
-			logger.Logger.Infof("Redirector: new task.")			
+			logger.Logger.Infof("Redirector: new task %d - %d #%d", p.cId, p.msgID, p.embedIndex)
 			
 			var botMsg *discord.Message
 			var originalMsg *discord.Message
@@ -321,8 +322,6 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 				}
 				return
 			}
-
-			logger.Logger.Infof("  Redirecting to channel %d", destCId)
 			
 			var data *api.SendMessageData
 			data, err = prepareRedirectionMessage(originalMsg, p, isAuto, isGuessCorrect)
@@ -330,7 +329,8 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 				logger.Logger.Errorf("Failed to prepare redirection message!\n%v", err)
 			}
 	
-			_, err = s.SendMessageComplex(
+			var rm *discord.Message
+			rm, err = s.SendMessageComplex(
 				discord.ChannelID(destCId), *data,
 			)
 	
@@ -343,7 +343,8 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 			if err != nil {
 				logger.Logger.Errorf("F2: %s", err)
 			}
-	
+
+			logger.Logger.Infof("  Redirected     c%d - m%d", destCId, rm.ID)	
 			atomic.AddUint64(&statSession.Redirected, 1)
 
 			err = s.DeleteMessage(botMsg.ChannelID, botMsg.ID, "Temporary bot message")
@@ -386,7 +387,7 @@ func prepareRedirectionMessage (originalMsg *discord.Message, nextPending *pendi
 		}
 	} ()
 	return  &api.SendMessageData{
-		Content:    "ｷﾀｷﾀ────=====≡≡Σ≡Σ(((つ•̀ㅂ•́)و \\*✧\\*✧\\*✧ ",
+		Content:    "ｷﾀｷﾀ────=====≡≡Σ≡Σ((つ*°∀°)و \\*✧\\*✧\\*✧ ",
 		Embeds:     []discord.Embed{
 			{
 				Type: discord.NormalEmbed,
@@ -436,7 +437,7 @@ func prepareRedirectionMessage (originalMsg *discord.Message, nextPending *pendi
 func decideType (pending *pendingEmbed, botMsg *discord.Message) (rType redirect.RedirectType, auto bool, err error) {
 	
 	if pending.urlValidation != botMsg.ReferencedMessage.Embeds[pending.embedIndex].URL {
-		logger.Logger.Infof("  Url modified, abort.")
+		logger.Logger.Infof("  [!] Url modified, ABORT!")
 		return redirect.None, true, nil
 
 	}
@@ -476,24 +477,40 @@ func decideType (pending *pendingEmbed, botMsg *discord.Message) (rType redirect
 		}
 	}
 
-
-	logger.Logger.Infof("  o: %d / c: %d / s: %d / n: %d", c_o, c_c, c_s, c_n)
-
 	sum := c_o + c_c + c_s
 	if sum == 0 || (c_n > c_o - 1 && c_n > c_c - 1 && c_n > c_s - 1) {
-		logger.Logger.Infof("  Result: Cancel.")
+		if pending.guess == redirect.None {
+			logger.Logger.Infof("  CANCEL   | o%d c%d s%d n%d ✔️", c_o, c_c, c_s, c_n)
+		} else {
+			logger.Logger.Infof("  CANCEL   | o%d c%d s%d n%d", c_o, c_c, c_s, c_n)
+		}
 		return redirect.None, isAuto, nil
 	}
 
 	if c_o > c_c && c_o > c_s {
+		if pending.guess == redirect.Original {
+			logger.Logger.Infof("  ORIGINAL | o%d c%d s%d n%d ✔️", c_o, c_c, c_s, c_n)
+		} else {
+			logger.Logger.Infof("  ORIGINAL | o%d c%d s%d n%d", c_o, c_c, c_s, c_n)
+		}
 		rType = redirect.Original
 	}
 
 	if c_s > c_c && c_s > c_o {
+		if pending.guess == redirect.Stream {
+			logger.Logger.Infof("  STREAM   | o%d c%d s%d n%d ✔️", c_o, c_c, c_s, c_n)
+		} else {
+			logger.Logger.Infof("  STREAM   | o%d c%d s%d n%d", c_o, c_c, c_s, c_n)
+		}
 		rType = redirect.Stream
 	}
 
 	if c_c > c_s && c_c > c_o {
+		if pending.guess == redirect.Cover {
+			logger.Logger.Infof("  COVER    | o%d c%d s%d n%d ✔️", c_o, c_c, c_s, c_n)
+		} else {
+			logger.Logger.Infof("  COVER    | o%d c%d s%d n%d", c_o, c_c, c_s, c_n)
+		}
 		rType = redirect.Cover
 	}
 

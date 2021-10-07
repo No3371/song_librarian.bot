@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"log"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -105,7 +105,7 @@ func onMessageCreated (s *state.State, m *discord.Message) (err error) {
 			// Find all bindings bound
 			// For each binding, for each redirection, if the regex match...
 			for ei, e := range m.Embeds {
-				logger.Logger.Infof("Analyzing embed: %s (%s)", e.Title, e.URL)
+				logger.Logger.Infof("💬 %s (%s) / %d #%d", e.Title, e.URL, m.ID, ei)
 				atomic.AddUint64(&statSession.AnalyzedEmbeds, 1)
 				urlMatching: for i := 0; i < urlRegexCount; i++ {
 					if b.UrlRegexEnabled(i) {
@@ -158,7 +158,7 @@ func pendEmbed (s *state.State, om *discord.Message, eIndex int, bId int) error 
 	}
 	botM, err := s.SendMessageComplex(om.ChannelID, sendMessageData)
 	if err != nil {
-		log.Printf("[Error] %s", fmt.Errorf("%w", err))
+		logger.Logger.Errorf("%v", fmt.Errorf("%w", err))
 		return err
 	}
 
@@ -201,7 +201,7 @@ func pendEmbed (s *state.State, om *discord.Message, eIndex int, bId int) error 
 	// 	log.Printf("[Error] %s", fmt.Errorf("%w", err))
 	// 	return err
 	// }
-	logger.Logger.Infof("  Pending %d embed#%d...", om.ID, eIndex)
+	logger.Logger.Infof("  Pending %d #%d...", om.ID, eIndex)
 	pendingEmbeds<-&pendingEmbed{
 		cId: botM.ChannelID,
 		msgID: botM.ID,
@@ -236,31 +236,35 @@ func guess (embed discord.Embed) (redirectType redirect.RedirectType, err error)
 	var countC = 0
 	var countS = 0
 
-	logger.Logger.Infof("  [GUESS]")
+	sb := &strings.Builder{}
 
-	countC, err = countMatch("Cover   ", regexCover_s0, embed.Title)
+	countC, err = countMatch(sb, "Cover", regexCover_s0, embed.Title)
 	if err != nil {
 		logger.Logger.Errorf("Failed to match for Cover keywords: %v", err)
 		return redirect.Unknown, err
 	}
 
-	countO, err = countMatch("Original", regexOriginal_s1, embed.Title)
+	countO, err = countMatch(sb,"Original", regexOriginal_s1, embed.Title)
 	if err != nil {
 		logger.Logger.Errorf("Failed to match for Original keywords: %v", err)
 		return redirect.Unknown, err
 	}
 
-	countS, err = countMatch("Stream  ", regexStream_s2, embed.Title)
+	countS, err = countMatch(sb,"Stream", regexStream_s2, embed.Title)
 	if err != nil {
 		logger.Logger.Errorf("Failed to match for Stream keywords: %v", err)
 		return redirect.Unknown, err
 	}
 
-	logger.Logger.Infof("  [GUESS] o: %d / c: %d / s: %d", countO, countC, countS)
 
 	if countC + countO + countS == 0 {
+		logger.Logger.Infof("  [GUESS] o%d c%d s%d", countO, countC, countS)
 		return redirect.None, nil
+	} else {
+		logger.Logger.Infof("  [GUESS] %s", sb.String())
+		logger.Logger.Infof("  [GUESS] o%d c%d s%d", countO, countC, countS)
 	}
+
 
 	if countC == countO && countO == countS {
 		return redirect.Unknown, nil
@@ -285,7 +289,7 @@ func guess (embed discord.Embed) (redirectType redirect.RedirectType, err error)
 }
 
 
-func countMatch (regexType string, r *regexp2.Regexp, subject string) (count int, err error) {
+func countMatch (sb *strings.Builder, regexType string, r *regexp2.Regexp, subject string) (count int, err error) {
 	var m *regexp2.Match
 	m, err = r.FindStringMatch(subject)
 	if err != nil || m == nil {
@@ -293,18 +297,17 @@ func countMatch (regexType string, r *regexp2.Regexp, subject string) (count int
 	}
 
 	count ++
-	logger.Logger.Infof("    %s", regexType)
-	logger.Logger.Infof("      %s", m.String())
+	sb.WriteString(fmt.Sprintf("    (%s) %s", regexType, m.String()))
 	for m != nil {
 		m, err = r.FindNextMatch(m)
 		if err != nil {
-			logger.Logger.Errorf("%s", err)
+			logger.Logger.Errorf("  %s", err)
 			return count, err
-		} else if m != nil {
-			count++
-			logger.Logger.Infof("      %s", m.String())
+			} else if m != nil {
+				count++
+				sb.WriteString(fmt.Sprintf(" / %s", m.String()))
+			}
 		}
-	}
 
 	return count, err
 }

@@ -8,4 +8,6 @@ const (
 
 	commandNameChannel = "channel"
 	commandNameDelete = "dm"
+
+	needVoteDelayMultiplier = 2
 )
