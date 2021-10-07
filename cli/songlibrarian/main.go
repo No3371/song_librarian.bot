@@ -259,7 +259,7 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 					break
 				} else {
 					if originalMsg, err = s.Message(botMsg.Reference.ChannelID, botMsg.Reference.MessageID); originalMsg == nil || err != nil {
-						logger.Logger.Errorf("Original message inaccessible: %d (error? %s)", botMsg.Reference.MessageID, err)
+						logger.Logger.Errorf("Original message inaccessible")
 						nextPending = nil
 						err = s.DeleteMessage(botMsg.ChannelID, botMsg.ID, "Temporary bot message")
 						if err != nil {
