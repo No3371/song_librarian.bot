@@ -242,6 +242,13 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 				delay = time.Second * 5
 			}
 
+			switch p.guess {
+			case redirect.Unknown:
+			case redirect.Clip:
+			case redirect.None:
+				delay *= needVoteDelayMultiplier
+			}
+
 
 			for passed < delay {
 				t.Reset(time.Second * 10)

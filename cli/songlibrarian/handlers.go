@@ -146,13 +146,13 @@ func pendEmbed (s *state.State, om *discord.Message, eIndex int, bId int) error 
 		sendMessageData.Content = fmt.Sprintf(locale.DETECTED, fmt.Sprintf("%s", embed.Title), locale.STREAM, int64((*globalFlags.delay).Seconds()))
 		break
 	case redirect.None:
-		sendMessageData.Content = fmt.Sprintf(locale.DETECTED_MATCH_NONE, fmt.Sprintf("%s", embed.Title), int64((*globalFlags.delay).Seconds()))
+		sendMessageData.Content = fmt.Sprintf(locale.DETECTED_MATCH_NONE, fmt.Sprintf("%s", embed.Title), int64((*globalFlags.delay).Seconds() * needVoteDelayMultiplier))
 		break
 	case redirect.Unknown:
-		sendMessageData.Content = fmt.Sprintf(locale.DETECTED_UNKNOWN, fmt.Sprintf("%s", embed.Title), int64((*globalFlags.delay).Seconds()))
+		sendMessageData.Content = fmt.Sprintf(locale.DETECTED_UNKNOWN, fmt.Sprintf("%s", embed.Title), int64((*globalFlags.delay).Seconds() * needVoteDelayMultiplier))
 		break
 	case redirect.Clip:
-		sendMessageData.Content = fmt.Sprintf(locale.DETECTED_CLIPS, fmt.Sprintf("%s", embed.Title), int64((*globalFlags.delay).Seconds()))
+		sendMessageData.Content = fmt.Sprintf(locale.DETECTED_CLIPS, fmt.Sprintf("%s", embed.Title), int64((*globalFlags.delay).Seconds() * needVoteDelayMultiplier))
 		rType = redirect.None
 		break
 	}
