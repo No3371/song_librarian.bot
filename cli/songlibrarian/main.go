@@ -287,7 +287,6 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 						logger.Logger.Errorf("Failed to remove the bot message: %d", err)
 					}
 				}
-				return
 			}
 	
 			// Check if the original message is not deleted
