@@ -37,9 +37,24 @@ type pendingEmbed struct {
 	embedIndex int
 	urlValidation string
 	bindingId int
-	createdTime time.Time
-	guess redirect.RedirectType
+	estimatedRTime time.Time
+	guess, preType redirect.RedirectType
 }
+
+type resultType int
+
+const (
+	RESULT_BOT_GUESS resultType = iota
+	RESULT_BOT_GUESS_AGREED
+	RESULT_BOT_GUESS_FIXED
+	RESULT_COMMUNITY
+	RESULT_SHARER
+	RESULT_SHARER_FIXED
+	RESULT_SHARER_AND_COMMUNITY
+	RESULT_SHARER_AND_BOT
+	RESULT_SHARER_AND_BOT_AND_COMMUNITY
+	FALLBACK
+)
 
 
 var processCloser chan struct{}
@@ -219,6 +234,10 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 		t := time.NewTimer(time.Minute)
 
 		processRedirect := func (p *pendingEmbed) (err error){
+			if p.guess == redirect.Clip {
+				panic("HOW IT GETS HERE")
+			}
+
 			defer func () {
 				if err == nil {
 					if pErr := recover(); pErr != nil {
@@ -235,7 +254,7 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 				panic("nil pended?")
 			}
 	
-			passed := time.Now().Sub(p.createdTime)
+			passed := time.Now().Sub(p.estimatedRTime)
 			delay := *globalFlags.delay
 			
 			if *globalFlags.dev {
@@ -259,7 +278,7 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 				}
 
 				
-				botMsg, err = s.Message(p.cId, p.msgID)
+				botMsg, err = validate(s, p.cId, p.msgID)
 				if err != nil || botMsg == nil {
 					// Failed to access the bot message, deleted?
 					logger.Logger.Errorf("Bot message inaccessible: %d", p.msgID)
@@ -276,41 +295,24 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 					}
 				}
 
-				passed = time.Now().Sub(p.createdTime)
+				passed = time.Now().Sub(p.estimatedRTime)
 			}
 			
 
 			// Do it again because passed < delay may not always be true
-			botMsg, err = s.Message(p.cId, p.msgID)
-			if err != nil || botMsg == nil {
-				// Failed to access the bot message, deleted?
-				logger.Logger.Errorf("Bot message inaccessible: %d", p.msgID)
-				return
-			} else {
-				if originalMsg, err = s.Message(botMsg.Reference.ChannelID, botMsg.Reference.MessageID); originalMsg == nil || err != nil {
-					logger.Logger.Errorf("Original message inaccessible (error? %v", err)
-					err = s.DeleteMessage(botMsg.ChannelID, botMsg.ID, "Temporary bot message")
-					if err != nil {
-						// Failed to remove the bot message...?
-						logger.Logger.Errorf("Failed to remove the bot message: %d", err)
-					}
-				}
-			}
+			botMsg, err = validate(s, p.cId, p.msgID)
 	
 			// Check if the original message is not deleted
-			var isAuto, isGuessCorrect bool
-			var rType redirect.RedirectType
-			rType, isAuto, err = decideType(p, botMsg)
+			var voteSum int
+			var finalType redirect.RedirectType
+			var result resultType = FALLBACK
+			finalType, voteSum, err = decideType(p, botMsg)
 			if err != nil {
 				// Failed to remove the bot message...?
 				logger.Logger.Errorf("Failed to decide type: %v", err)
 			}
 
-			if rType == p.guess {
-				isGuessCorrect = true
-			}
-			
-			if rType == redirect.None {
+			if finalType == redirect.None {
 				err = s.DeleteMessage(botMsg.ChannelID, botMsg.ID, "Temporary bot message")
 				if err != nil {
 					// Failed to remove the bot message...?
@@ -318,10 +320,51 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 				}
 				return
 			}
+
+			if voteSum == 0 { // No one voted
+				if p.preType == redirect.Unknown { // It's NOT pre-typed
+					if finalType == p.guess {
+						result = RESULT_BOT_GUESS
+					} else {
+						panic("WHO CHANGED MY ANSWER!?")
+					}
+				} else {
+					if p.preType != finalType {
+						panic("WHO CHANGED HIS ANSWER!!??")
+					}
+
+					if p.guess == finalType { // Bot guessed it right
+						result = RESULT_SHARER_AND_BOT
+					} else {
+						result = RESULT_SHARER
+					}
+				}
+			} else { // Some one voted
+				if p.preType == redirect.Unknown { // It's NOT pre-typed
+					if p.guess == redirect.Unknown {
+						result = RESULT_COMMUNITY
+					} else if finalType == p.guess {
+						result = RESULT_BOT_GUESS_AGREED
+					} else {
+						result = RESULT_BOT_GUESS_FIXED
+					}
+				} else {
+					if p.guess == finalType && p.preType == finalType {
+						result = RESULT_SHARER_AND_BOT_AND_COMMUNITY
+					} else if p.guess == finalType {
+						result = RESULT_SHARER_AND_BOT
+					} else if p.preType == finalType {
+						result = RESULT_SHARER_AND_COMMUNITY
+					} else {
+						result = RESULT_BOT_GUESS_FIXED
+					}
+				}
+			}
+			
 	
-			destCId, bound := binding.QueryBinding(p.bindingId).DestChannelId(rType)
+			destCId, bound := binding.QueryBinding(p.bindingId).DestChannelId(finalType)
 			if !bound {
-				logger.Logger.Infof("[MAIN] No destination bound to %v", rType)
+				logger.Logger.Infof("[MAIN] No destination bound to %v", finalType)
 				err = s.DeleteMessage(botMsg.ChannelID, botMsg.ID, "Temporary bot message")
 				if err != nil {
 					// Failed to remove the bot message...?
@@ -331,7 +374,7 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 			}
 			
 			var data *api.SendMessageData
-			data, err = prepareRedirectionMessage(originalMsg, p, isAuto, isGuessCorrect)
+			data, err = prepareRedirectionMessage(originalMsg, p, result)
 			if err != nil {
 				logger.Logger.Errorf("Failed to prepare redirection message!\n%v", err)
 			}
@@ -385,7 +428,7 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 	return loopDone
 }
 
-func prepareRedirectionMessage (originalMsg *discord.Message, nextPending *pendingEmbed, isAuto bool, isGuessCorrect bool) (data *api.SendMessageData, err error) {
+func prepareRedirectionMessage (originalMsg *discord.Message, nextPending *pendingEmbed, result resultType) (data *api.SendMessageData, err error) {
 	defer func () {
 		if err == nil {
 			if pErr := recover(); pErr != nil {
@@ -421,16 +464,27 @@ func prepareRedirectionMessage (originalMsg *discord.Message, nextPending *pendi
 						Inline: true,
 					},
 					{
-						Name: locale.SDTYPE,
+						Name: locale.DECISION_TYPE,
 						Value: func () string{
-							if isAuto  {
-								return locale.SDTYPE_AUTO
-							} else {
-								if isGuessCorrect {
-									return locale.SDTYPE_MANUAL
-								} else {
-									return locale.SDTYPE_MANUAL_CORRECTION
-								}
+							switch result{
+							case RESULT_BOT_GUESS:
+								return locale.DECISION_BOT
+							case RESULT_BOT_GUESS_AGREED:
+								return locale.DECISION_COMMUNITY_AGREE
+							case RESULT_BOT_GUESS_FIXED:
+								return locale.DECISION_COMMUNITY_FIX
+							case RESULT_COMMUNITY:
+								return locale.DECISION_COMMUNITY_HELP
+							case RESULT_SHARER:
+								return locale.DECISION_SHARER
+							case RESULT_SHARER_AND_BOT:
+								return locale.DECISION_SHARER_AND_BOT
+							case RESULT_SHARER_AND_BOT_AND_COMMUNITY:
+								return locale.DECISION_SHARER_AND_BOT_AND_COMMUNITY
+							case RESULT_SHARER_AND_COMMUNITY:
+								return locale.DECISION_SHARER_AND_COMMUNITY
+							default:
+								return "?"
 							}
 						} (),
 						Inline: true,
@@ -441,16 +495,16 @@ func prepareRedirectionMessage (originalMsg *discord.Message, nextPending *pendi
 	}, nil
 }
 
-func decideType (pending *pendingEmbed, botMsg *discord.Message) (rType redirect.RedirectType, auto bool, err error) {
+// decideType only gives Original, Cover, Stream, None
+func decideType (pending *pendingEmbed, botMsg *discord.Message) (rType redirect.RedirectType, voteSum int, err error) {
 	
 	if pending.urlValidation != botMsg.ReferencedMessage.Embeds[pending.embedIndex].URL {
 		logger.Logger.Infof("  [!] Url modified, ABORT!")
-		return redirect.None, true, nil
+		return redirect.None, 0, nil
 
 	}
 
 	var c_o, c_c, c_s, c_n int
-	var isAuto bool = false
 
 	for _, r := range botMsg.Reactions {
 		switch r.Emoji.Name {
@@ -469,8 +523,8 @@ func decideType (pending *pendingEmbed, botMsg *discord.Message) (rType redirect
 		}
 	}
 
-	if c_o + c_c + c_s + c_n == 0 { // If no user vote, apply guess
-		isAuto = true
+	voteSum = c_o + c_c + c_s + c_n
+	if voteSum == 0 && pending.preType == redirect.Unknown { // If no user vote and no pre_type, apply guess
 		switch pending.guess {
 		case redirect.Original:
 			c_o++
@@ -491,7 +545,7 @@ func decideType (pending *pendingEmbed, botMsg *discord.Message) (rType redirect
 		} else {
 			logger.Logger.Infof("  CANCEL   | o%d c%d s%d n%d", c_o, c_c, c_s, c_n)
 		}
-		return redirect.None, isAuto, nil
+		return redirect.None, voteSum, nil
 	}
 
 	if c_o > c_c && c_o > c_s {
@@ -521,5 +575,27 @@ func decideType (pending *pendingEmbed, botMsg *discord.Message) (rType redirect
 		rType = redirect.Cover
 	}
 
-	return rType, isAuto, nil
+	return rType, voteSum, nil
+}
+
+func validate (s *state.State, botMsgCId discord.ChannelID, botMsgID discord.MessageID) (botMsg *discord.Message, err error) {
+	botMsg, err = s.Message(botMsgCId, botMsgID)
+	if err != nil || botMsg == nil {
+		// Failed to access the bot message, deleted?
+		logger.Logger.Errorf("Bot message inaccessible: %d", botMsgCId)
+		return botMsg, err
+	} else {
+		if originalMsg, err := s.Message(botMsg.Reference.ChannelID, botMsg.Reference.MessageID); originalMsg == nil || err != nil {
+			logger.Logger.Errorf("Original message inaccessible (error? %v", err)
+			err = s.DeleteMessage(botMsg.ChannelID, botMsg.ID, "Temporary bot message")
+			if err != nil {
+				// Failed to remove the bot message...?
+				logger.Logger.Errorf("Failed to remove the bot message: %d", err)
+			} else {
+				botMsg = nil
+			}
+			return botMsg, err
+		}
+	}
+	return botMsg, nil
 }

@@ -137,6 +137,9 @@ func onMessageCreated (s *state.State, task *mHandleSession) (err error) {
 								case "s":
 									task.setTypes = append(task.setTypes, redirect.Stream)
 									break
+								case "x":
+									task.setTypes = append(task.setTypes, redirect.None)
+									break
 								case "_":
 									task.setTypes = append(task.setTypes, redirect.Unknown)
 									break
@@ -157,7 +160,7 @@ func onMessageCreated (s *state.State, task *mHandleSession) (err error) {
 						if isMatch, _ := regexUrlMapping[i].MatchString(e.URL); isMatch {
 							atomic.AddUint64(&statSession.UrlRegexMatched, 1)
 							logger.Logger.Infof("  Binding#%d - UrlRegex#%d match!", bId, i)
-							if err := pendEmbed(s, task.msg, ei, bId); err != nil {
+							if err := pendEmbed(s, task, ei, bId); err != nil {
 								logger.Logger.Errorf("%s", err)
 								continue
 							} else {
@@ -174,34 +177,74 @@ func onMessageCreated (s *state.State, task *mHandleSession) (err error) {
 	return nil
 }
 
-func pendEmbed (s *state.State, om *discord.Message, eIndex int, bId int) error {
-	embed := om.Embeds[eIndex]
+func pendEmbed (s *state.State, task *mHandleSession, eIndex int, bId int) error {
+	embed := task.msg.Embeds[eIndex]
 	var sendMessageData api.SendMessageData = api.SendMessageData{
-		Reference: &discord.MessageReference{ MessageID: om.ID},
+		Reference: &discord.MessageReference{ MessageID: task.msg.ID},
 	}
-	rType, err := guess(embed)
-	switch rType {
-	case redirect.Original:
-		sendMessageData.Content = fmt.Sprintf(locale.DETECTED, fmt.Sprintf("%s", embed.Title), locale.ORIGINAL, int64((*globalFlags.delay).Seconds()))
-		break
-	case redirect.Cover:
-		sendMessageData.Content = fmt.Sprintf(locale.DETECTED, fmt.Sprintf("%s", embed.Title), locale.COVER, int64((*globalFlags.delay).Seconds()))
-		break
-	case redirect.Stream:
-		sendMessageData.Content = fmt.Sprintf(locale.DETECTED, fmt.Sprintf("%s", embed.Title), locale.STREAM, int64((*globalFlags.delay).Seconds()))
-		break
-	case redirect.None:
-		sendMessageData.Content = fmt.Sprintf(locale.DETECTED_MATCH_NONE, fmt.Sprintf("%s", embed.Title), int64((*globalFlags.delay).Seconds() * needVoteDelayMultiplier))
-		break
-	case redirect.Unknown:
-		sendMessageData.Content = fmt.Sprintf(locale.DETECTED_UNKNOWN, fmt.Sprintf("%s", embed.Title), int64((*globalFlags.delay).Seconds() * needVoteDelayMultiplier))
-		break
-	case redirect.Clip:
-		sendMessageData.Content = fmt.Sprintf(locale.DETECTED_CLIPS, fmt.Sprintf("%s", embed.Title), int64((*globalFlags.delay).Seconds() * needVoteDelayMultiplier))
-		rType = redirect.None
-		break
+	myGuess, err := guess(embed)
+	if err != nil {
+		logger.Logger.Errorf("  Guessing error: %v", err)
+		myGuess = redirect.Unknown
 	}
-	botM, err := s.SendMessageComplex(om.ChannelID, sendMessageData)
+	var delay time.Duration = *globalFlags.delay
+
+	preType := task.setTypes[eIndex]
+	if len(task.setTypes) > eIndex && preType != redirect.Unknown { // If not UNKNOWN, accept the preype
+		if preType == redirect.None {
+			logger.Logger.Infof("  He said no!")
+			return nil
+		}
+
+		var format, typeLocale string
+		switch preType {
+		case redirect.Original:
+			typeLocale = locale.ORIGINAL
+			break
+		case redirect.Cover:
+			typeLocale = locale.COVER
+			break
+		case redirect.Stream:
+			typeLocale = locale.STREAM
+			break
+		}
+
+		if myGuess == preType {
+			delay *= delay * 5 / 10
+			format = locale.DETECTED_PRE_TYPED_AGREED
+		} else {
+			delay = delay * 7/ 10
+			format = locale.DETECTED_PRE_TYPED
+		}
+
+		sendMessageData.Content = fmt.Sprintf(format, embed.Title, typeLocale, delay.Seconds())
+
+	} else {
+		switch myGuess {
+		case redirect.Original:
+			sendMessageData.Content = fmt.Sprintf(locale.DETECTED, embed.Title, locale.ORIGINAL, delay.Seconds())
+			break
+		case redirect.Cover:
+			sendMessageData.Content = fmt.Sprintf(locale.DETECTED, embed.Title, locale.COVER, delay.Seconds())
+			break
+		case redirect.Stream:
+			sendMessageData.Content = fmt.Sprintf(locale.DETECTED, embed.Title, locale.STREAM, delay.Seconds())
+			break
+		case redirect.None:
+			delay *= 2
+			sendMessageData.Content = fmt.Sprintf(locale.DETECTED_MATCH_NONE, embed.Title, delay.Seconds())
+			break
+		case redirect.Unknown:
+			delay *= 2
+			sendMessageData.Content = fmt.Sprintf(locale.DETECTED_UNKNOWN, embed.Title, delay.Seconds())
+			break
+		case redirect.Clip:
+			sendMessageData.Content = fmt.Sprintf(locale.DETECTED_CLIPS, embed.Title, delay.Seconds())
+			myGuess = redirect.None
+			break
+		}
+	}
+	botM, err := s.SendMessageComplex(task.msg.ChannelID, sendMessageData)
 	if err != nil {
 		logger.Logger.Errorf("%v", fmt.Errorf("%w", err))
 		return err
@@ -246,15 +289,16 @@ func pendEmbed (s *state.State, om *discord.Message, eIndex int, bId int) error 
 	// 	log.Printf("[Error] %s", fmt.Errorf("%w", err))
 	// 	return err
 	// }
-	logger.Logger.Infof("  Pending %d #%d...", om.ID, eIndex)
+	logger.Logger.Infof("  Pending %d #%d...", task.msg.ID, eIndex)
 	pendingEmbeds<-&pendingEmbed{
 		cId: botM.ChannelID,
 		msgID: botM.ID,
 		embedIndex: eIndex,
-		urlValidation: om.Embeds[eIndex].URL,
+		urlValidation: task.msg.Embeds[eIndex].URL,
 		bindingId: bId,
-		createdTime: time.Now(),
-		guess: rType,
+		estimatedRTime: time.Now().Add(delay),
+		guess: myGuess,
+		preType: preType,
 	}
 
 	return nil
