@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"strings"
 	"sync/atomic"
@@ -16,18 +17,28 @@ import (
 	"github.com/diamondburned/arikawa/v3/state"
 	"github.com/dlclark/regexp2"
 )
-type item struct {
-	c discord.ChannelID
-	m discord.MessageID
-}
+
 var fetchDelayTimer *time.Timer = time.NewTimer(time.Second * 3)
-var buffer chan item
+var buffer chan *mHandleSession
 
 func init () {
-	buffer = make(chan item, 128)
+	buffer = make(chan *mHandleSession, 128)
 }
 
-func addEventHandlers (s *state.State) {
+type mHandleSession struct {
+	me discord.UserID
+	cId discord.ChannelID
+	mId discord.MessageID
+	msg *discord.Message
+	setTypes []redirect.RedirectType
+}
+
+func addEventHandlers (s *state.State) (err error){
+	me, err := s.Me()
+	if err != nil {
+		return err
+	}
+
 	s.AddHandler(func (e *gateway.MessageCreateEvent) {
 		if e.Author.Bot {
 			return
@@ -35,48 +46,57 @@ func addEventHandlers (s *state.State) {
 
 		atomic.AddUint64(&statSession.MessageEvents, 1)
 
-		buffer<-item{
-			c: e.Message.ChannelID,
-			m: e.Message.ID,
+		buffer<-&mHandleSession{
+			me: me.ID,
+			cId: e.Message.ChannelID,
+			mId: e.Message.ID,
 		}
 	})
 
-	go func () {
-		for {
-			it := <-buffer
-			atomic.AddUint64(&statSession.MessageBuffered, 1)
-			m, err := s.Message(it.c, it.m)
-			if m == nil || err != nil {
-				continue
-			}
-			if len(m.Embeds) == 0 {
-				atomic.AddUint64(&statSession.FirstFetchEmbeds0, 1)
-			}
-			if time.Now().Sub(m.Timestamp.Time().Local()) < time.Second*2 {
-				<-fetchDelayTimer.C
-				fetchDelayTimer.Reset(time.Second * 2)
-				m, err = s.Message(it.c, it.m)
-				if len(m.Embeds) == 0 {
-					atomic.AddUint64(&statSession.SecondFetchEmbeds0, 1)
-				}
-			}
-			err = onMessageCreated(s, m)
-			if err != nil {
-				logger.Logger.Errorf("[HANDLER] OnMessageCreated error: %v", err)
+	go handlerLoop(s)
+	return nil
+}
+
+func handlerLoop (s *state.State) {
+	var err error
+	for {
+		item := <-buffer
+		atomic.AddUint64(&statSession.MessageBuffered, 1)
+		item.msg, err = s.Message(item.cId, item.mId)
+		if item.msg == nil || err != nil {
+			logger.Logger.Infof("[HANDLER] Buffered item invalid. error? %v", err)
+			continue
+		}
+
+		if len(item.msg.Embeds) == 0 {
+			atomic.AddUint64(&statSession.FirstFetchEmbeds0, 1)
+		}
+
+		if time.Now().Sub(item.msg.Timestamp.Time().Local()) < time.Second*2 {
+			<-fetchDelayTimer.C
+			fetchDelayTimer.Reset(time.Second * 2)
+			item.msg, err = s.Message(item.cId, item.mId)
+			if len(item.msg.Embeds) == 0 {
+				atomic.AddUint64(&statSession.SecondFetchEmbeds0, 1)
 			}
 		}
-	}()
+
+		err = onMessageCreated(s, item)
+		if err != nil {
+			logger.Logger.Errorf("[HANDLER] OnMessageCreated error: %v", err)
+		}
+	}
 
 }
 
-func onMessageCreated (s *state.State, m *discord.Message) (err error) {
+func onMessageCreated (s *state.State, task *mHandleSession) (err error) {
 	defer func () {
 		if p := recover(); p != nil {
 			logger.Logger.Errorf("%s", p)
 		}
 	}()
 
-	if bIds := binding.GetMappedBindingIDs(uint64(m.ChannelID)); bIds != nil {
+	if bIds := binding.GetMappedBindingIDs(uint64(task.msg.ChannelID)); bIds != nil {
 		for bId := range bIds {
 			b := binding.QueryBinding(bId)
 			if b == nil {
@@ -84,38 +104,60 @@ func onMessageCreated (s *state.State, m *discord.Message) (err error) {
 				continue
 			}
 
-			if len(m.Embeds) == 0 {
+			if len(task.msg.Embeds) == 0 {
 				<-fetchDelayTimer.C
 				fetchDelayTimer.Reset(time.Second * 2)
-				m, err = s.Message(m.ChannelID, m.ID)
-				if m == nil || err != nil {
+				task.msg, err = s.Message(task.msg.ChannelID, task.msg.ID)
+				if task == nil || err != nil {
 					logger.Logger.Errorf("The message is gone!? Abort!\n%v", err)
 					return
 				}
-				if len(m.Embeds) == 0 {
+				if len(task.msg.Embeds) == 0 {
 					atomic.AddUint64(&statSession.ThirdFetchEmbeds0, 1)
 				}
 			}
 			
-			if len(m.Embeds) > 0 {
+			if len(task.msg.Embeds) > 0 {
 				atomic.AddUint64(&statSession.FetchedAndAnalyzed, 1)
 			}
-			// iErr := s.mes(*m, true)
-			// if iErr != nil {
-			// 	logger.Logger.Infof("[HANDLER] MessageCreateEvent: Update failed: %v", err)
-			// }
+
+			for _, mentioned := range task.msg.Mentions {
+				if mentioned.ID == task.me {
+					scanner := bufio.NewScanner(strings.NewReader(task.msg.Content))
+					for scanner.Scan() {
+						if line := scanner.Text(); strings.HasPrefix(line, "!song ") {
+							for _, flag := range strings.Fields(line) {
+								switch flag {
+								case "o":
+									task.setTypes = append(task.setTypes, redirect.Original)
+									break
+								case "c":
+									task.setTypes = append(task.setTypes, redirect.Cover)
+									break
+								case "s":
+									task.setTypes = append(task.setTypes, redirect.Stream)
+									break
+								case "_":
+									task.setTypes = append(task.setTypes, redirect.Unknown)
+									break
+								}
+							}
+						}
+					}
+				}
+			}
 	
 			// Find all bindings bound
 			// For each binding, for each redirection, if the regex match...
-			for ei, e := range m.Embeds {
-				logger.Logger.Infof("💬 %s (%s) / %d #%d", e.Title, e.URL, m.ID, ei)
+			for ei, e := range task.msg.Embeds {
+				logger.Logger.Infof("💬 %s (%s) / %d #%d", e.Title, e.URL, task.msg.ID, ei)
 				atomic.AddUint64(&statSession.AnalyzedEmbeds, 1)
 				urlMatching: for i := 0; i < urlRegexCount; i++ {
 					if b.UrlRegexEnabled(i) {
 						if isMatch, _ := regexUrlMapping[i].MatchString(e.URL); isMatch {
 							atomic.AddUint64(&statSession.UrlRegexMatched, 1)
 							logger.Logger.Infof("  Binding#%d - UrlRegex#%d match!", bId, i)
-							if err := pendEmbed(s, m, ei, bId); err != nil {
+							if err := pendEmbed(s, task.msg, ei, bId); err != nil {
 								logger.Logger.Errorf("%s", err)
 								continue
 							} else {
