@@ -236,7 +236,9 @@ func guess (embed discord.Embed) (redirectType redirect.RedirectType, err error)
 		}
 	} ()
 	var countO = 0
+	var countNotO = 0
 	var countC = 0
+	var countNotC = 0
 	var countS = 0
 
 	sb := &strings.Builder{}
@@ -247,9 +249,21 @@ func guess (embed discord.Embed) (redirectType redirect.RedirectType, err error)
 		return redirect.Unknown, err
 	}
 
+	countNotC, err = countMatch(sb, "NotCover", regexBadForCover, embed.Title)
+	if err != nil {
+		logger.Logger.Errorf("Failed to match for NotCover keywords: %v", err)
+		return redirect.Unknown, err
+	}
+
 	countO, err = countMatch(sb,"Original", regexOriginal_s1, embed.Title)
 	if err != nil {
 		logger.Logger.Errorf("Failed to match for Original keywords: %v", err)
+		return redirect.Unknown, err
+	}
+
+	countNotO, err = countMatch(sb, "NotOriginal", regexBadForOriginal, embed.Title)
+	if err != nil {
+		logger.Logger.Errorf("Failed to match for NotOriginal keywords: %v", err)
 		return redirect.Unknown, err
 	}
 
@@ -265,13 +279,16 @@ func guess (embed discord.Embed) (redirectType redirect.RedirectType, err error)
 		return redirect.None, nil
 	} else {
 		logger.Logger.Infof("  [GUESS] %s", sb.String())
-		logger.Logger.Infof("  [GUESS] o%d c%d s%d", countO, countC, countS)
+		logger.Logger.Infof("  [GUESS] o%d(-%d) c%d(-%d) s%d", countO, countNotO, countC, countNotC, countS)
 	}
 
 
 	if countC == countO && countO == countS {
 		return redirect.Unknown, nil
 	}
+
+	countC -= countNotC
+	countO -= countNotO
 
 	if countC > countO && countC > countS {
 		return redirect.Cover, nil
