@@ -26,18 +26,23 @@ func init () {
 }
 
 type mHandleSession struct {
-	me discord.UserID
 	cId discord.ChannelID
 	mId discord.MessageID
 	msg *discord.Message
 	setTypes []redirect.RedirectType
 }
 
+var meMentionCache string
+var meIDCahce discord.UserID
+
 func addEventHandlers (s *state.State) (err error){
 	me, err := s.Me()
 	if err != nil {
 		return err
 	}
+
+	meIDCahce = me.ID
+	meMentionCache = fmt.Sprintf("<@!%d>", meIDCahce)
 
 	s.AddHandler(func (e *gateway.MessageCreateEvent) {
 		if e.Author.Bot {
@@ -47,7 +52,6 @@ func addEventHandlers (s *state.State) (err error){
 		atomic.AddUint64(&statSession.MessageEvents, 1)
 
 		buffer<-&mHandleSession{
-			me: me.ID,
 			cId: e.Message.ChannelID,
 			mId: e.Message.ID,
 		}
@@ -122,10 +126,11 @@ func onMessageCreated (s *state.State, task *mHandleSession) (err error) {
 			}
 
 			for _, mentioned := range task.msg.Mentions {
-				if mentioned.ID == task.me {
+				if mentioned.ID == meIDCahce {
 					scanner := bufio.NewScanner(strings.NewReader(task.msg.Content))
 					for scanner.Scan() {
-						if line := scanner.Text(); strings.HasPrefix(line, "!song ") {
+						line := scanner.Text()
+						if strings.HasPrefix(line, meMentionCache) {
 							for _, flag := range strings.Fields(line) {
 								switch flag {
 								case "o":
@@ -159,7 +164,6 @@ func onMessageCreated (s *state.State, task *mHandleSession) (err error) {
 					if b.UrlRegexEnabled(i) {
 						if isMatch, _ := regexUrlMapping[i].MatchString(e.URL); isMatch {
 							atomic.AddUint64(&statSession.UrlRegexMatched, 1)
-							logger.Logger.Infof("  Binding#%d - UrlRegex#%d match!", bId, i)
 							if err := pendEmbed(s, task, ei, bId); err != nil {
 								logger.Logger.Errorf("%s", err)
 								continue
@@ -189,31 +193,45 @@ func pendEmbed (s *state.State, task *mHandleSession, eIndex int, bId int) error
 	}
 	var delay time.Duration = *globalFlags.delay
 
-	preType := task.setTypes[eIndex]
-	if len(task.setTypes) > eIndex && preType != redirect.Unknown { // If not UNKNOWN, accept the preype
-		if preType == redirect.None {
-			logger.Logger.Infof("  He said no!")
-			return nil
-		}
+	preType := redirect.Unknown
+	if len(task.setTypes) > eIndex {
+		preType = task.setTypes[eIndex]
+	}
 
+	if preType != redirect.Unknown { // If not UNKNOWN, accept the preype
 		var format, typeLocale string
 		switch preType {
 		case redirect.Original:
 			typeLocale = locale.ORIGINAL
+			logger.Logger.Infof("  pre_typed: o" )
 			break
 		case redirect.Cover:
 			typeLocale = locale.COVER
+			logger.Logger.Infof("  pre_typed: c" )
 			break
 		case redirect.Stream:
 			typeLocale = locale.STREAM
+			logger.Logger.Infof("  pre_typed: s" )
+			break
+		case redirect.None:
+			typeLocale = locale.DO_NOT_REDIRECT
+			logger.Logger.Infof("  pre_typed: x" )
 			break
 		}
 
 		if myGuess == preType {
-			delay *= delay * 5 / 10
+			if preType == redirect.None {
+				delay = delay * 4 / 10			
+			} else {
+				delay = delay * 5 / 10
+			}
 			format = locale.DETECTED_PRE_TYPED_AGREED
 		} else {
-			delay = delay * 7/ 10
+			if preType == redirect.None {
+				delay = delay * 4 / 10			
+			} else {
+				delay = delay * 7 / 10
+			}
 			format = locale.DETECTED_PRE_TYPED
 		}
 
@@ -231,11 +249,10 @@ func pendEmbed (s *state.State, task *mHandleSession, eIndex int, bId int) error
 			sendMessageData.Content = fmt.Sprintf(locale.DETECTED, embed.Title, locale.STREAM, delay.Seconds())
 			break
 		case redirect.None:
-			delay *= 2
 			sendMessageData.Content = fmt.Sprintf(locale.DETECTED_MATCH_NONE, embed.Title, delay.Seconds())
 			break
 		case redirect.Unknown:
-			delay *= 2
+			delay = delay * 3 / 2
 			sendMessageData.Content = fmt.Sprintf(locale.DETECTED_UNKNOWN, embed.Title, delay.Seconds())
 			break
 		case redirect.Clip:
