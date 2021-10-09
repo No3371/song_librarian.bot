@@ -376,6 +376,11 @@ func guess (embed discord.Embed) (redirectType redirect.RedirectType, err error)
 		return redirect.Unknown, err
 	}
 
+	countNotS, err = countMatch(sb, "NotStream", regexBadForStream, embed.Title)
+	if err != nil {
+		logger.Logger.Errorf("Failed to match for NotStream keywords: %v", err)
+		return redirect.Unknown, err
+	}
 
 	if countC + countO + countS == 0 {
 		logger.Logger.Infof("  [GUESS] o%d c%d s%d", countO, countC, countS)
@@ -392,6 +397,7 @@ func guess (embed discord.Embed) (redirectType redirect.RedirectType, err error)
 
 	countC -= countNotC
 	countO -= countNotO
+	countS -= countNotS
 
 	if countC > countO && countC > countS {
 		return redirect.Cover, nil
