@@ -14,6 +14,7 @@ type stats struct {
 	FetchedAndAnalyzed  uint64
 	AnalyzedEmbeds     uint64
 	UrlRegexMatched    uint64
+	SkippedDuplicate    uint64
 	Pended             uint64
 	Redirected         uint64
 }

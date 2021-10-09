@@ -36,9 +36,11 @@ type pendingEmbed struct {
 	msgID discord.MessageID
 	embedIndex int
 	urlValidation string
+	taskId string
 	bindingId int
 	estimatedRTime time.Time
-	guess, preType redirect.RedirectType
+	autoType, preType redirect.RedirectType
+	isDup bool
 }
 
 type resultType int
@@ -214,6 +216,7 @@ func session (sCloser chan struct{}) (err error) {
 	case <-sessionSelfCloser:
 	}
 	s.ErrorLog = nil
+	os.Stdin.WriteString("o")
 	select {
 	case <-promptClosed:
 	case <-time.NewTimer(time.Second*5).C:
@@ -242,7 +245,7 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 					}
 				}
 			} ()
-			logger.Logger.Infof("Redirector: new task %d - %d #%d", p.cId, p.msgID, p.embedIndex)
+			logger.Logger.Infof("Redirector: %s-%d", p.taskId, p.embedIndex)
 			
 			var botMsg *discord.Message
 			var originalMsg *discord.Message
@@ -252,12 +255,8 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 			}
 
 			for time.Now().Before(p.estimatedRTime) {
-				t.Reset(time.Second * 10)
-				select {
-					case <-t.C:
-				case <-loopCloser:
-					return nil
-				}
+				t.Reset(time.Second * 7)
+				<-t.C
 				
 				botMsg, originalMsg, err = validate(s, p.cId, p.msgID)
 				if botMsg == nil || originalMsg == nil {
@@ -278,7 +277,6 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 				return
 			}
 	
-			// Check if the original message is not deleted
 			var communityVotes int
 			var finalType redirect.RedirectType
 			var result resultType = FALLBACK
@@ -299,7 +297,7 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 
 			if communityVotes == 0 { // No one voted
 				if p.preType == redirect.Unknown { // It's NOT pre-typed
-					if finalType == p.guess {
+					if finalType == p.autoType {
 						result = RESULT_BOT_GUESS
 					} else {
 						panic("WHO CHANGED MY ANSWER!?")
@@ -309,7 +307,7 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 						panic("WHO CHANGED HIS ANSWER!!??")
 					}
 
-					if p.guess == finalType { // Bot guessed it right
+					if p.autoType == finalType { // Bot guessed it right
 						result = RESULT_SHARER_AND_BOT
 					} else {
 						result = RESULT_SHARER
@@ -317,17 +315,17 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 				}
 			} else { // Some one voted
 				if p.preType == redirect.Unknown { // It's NOT pre-typed
-					if p.guess == redirect.Unknown {
+					if p.autoType == redirect.Unknown {
 						result = RESULT_COMMUNITY
-					} else if finalType == p.guess {
+					} else if finalType == p.autoType {
 						result = RESULT_BOT_GUESS_AGREED
 					} else {
 						result = RESULT_BOT_GUESS_FIXED
 					}
 				} else {
-					if p.guess == finalType && p.preType == finalType {
+					if p.autoType == finalType && p.preType == finalType {
 						result = RESULT_SHARER_AND_BOT_AND_COMMUNITY
-					} else if p.guess == finalType {
+					} else if p.autoType == finalType {
 						result = RESULT_SHARER_AND_BOT
 					} else if p.preType == finalType {
 						result = RESULT_SHARER_AND_COMMUNITY
@@ -365,10 +363,18 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 			}
 	
 			_, err = s.SendMessage(discord.ChannelID(destCId), fmt.Sprintf("%s %s", originalMsg.Embeds[p.embedIndex].URL, locale.EXPLAIN_EMBED_RESOLVE))
-	
 			if err != nil {
 				logger.Logger.Errorf("F2: %s", err)
 			}
+
+			if communityVotes > 3 {	
+				_, err = s.SendMessage(discord.ChannelID(destCId), locale.HOT)
+				if err != nil {
+					logger.Logger.Errorf("F3: %s", err)
+				}
+			}
+
+			markRedirected(originalMsg.Embeds[p.embedIndex].URL)
 
 			logger.Logger.Infof("  Redirected     c%d - m%d", destCId, rm.ID)	
 			atomic.AddUint64(&statSession.Redirected, 1)
@@ -385,15 +391,21 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 			select {
 			case p := <-pendingEmbeds: // block until new pending
 				if rErr := processRedirect(p); rErr != nil {
-					logger.Logger.Infof("Redirector task with: %v", rErr)
-				}
-				select {
-				case <-loopCloser:
-					break rLoop
-				default:
+					logger.Logger.Infof("Redirector task failed with: %v", rErr)
 				}
 				break
 			case <-loopCloser:
+				endingLoop: for {
+					select {
+					case p := <-pendingEmbeds: // block until new pending
+						if rErr := processRedirect(p); rErr != nil {
+							logger.Logger.Infof("Redirector task failed with: %v", rErr)
+						}
+						break
+					default:
+						break endingLoop
+					}
+				}
 				break rLoop
 			}
 
@@ -501,9 +513,15 @@ func decideType (pending *pendingEmbed, botMsg *discord.Message) (rType redirect
 	}
 
 	communityVotes = c_o + c_c + c_s + c_n
-	if communityVotes == 0  { // If no user vote
+	if communityVotes == 0  {
+		if pending.isDup { // Skip duplicates
+			logger.Logger.Infof("  [%s] DUPLICATE", pending.taskId)
+			atomic.AddUint64(&statSession.SkippedDuplicate, 1)
+			return redirect.None, 0, nil
+		}
+		// If no user vote
 		if pending.preType == redirect.Unknown { //  and no pre_type, apply guess
-			switch pending.guess {
+			switch pending.autoType {
 				case redirect.Original:
 					c_o++
 					break
@@ -528,8 +546,8 @@ func decideType (pending *pendingEmbed, botMsg *discord.Message) (rType redirect
 			}
 		}
 	} else {
-		if pending.guess == pending.preType {
-			switch pending.guess {
+		if pending.autoType == pending.preType {
+			switch pending.autoType {
 				case redirect.Original:
 					c_o++
 					break
@@ -545,37 +563,37 @@ func decideType (pending *pendingEmbed, botMsg *discord.Message) (rType redirect
 
 	sum := c_o + c_c + c_s
 	if sum == 0 || (c_n > c_o - 1 && c_n > c_c - 1 && c_n > c_s - 1) {
-		if pending.guess == redirect.None {
-			logger.Logger.Infof("  CANCEL   | o%d c%d s%d n%d ✔️", c_o, c_c, c_s, c_n)
+		if pending.autoType == redirect.None {
+			logger.Logger.Infof("  [%s-%d] CANCEL   | o%d c%d s%d n%d ✔️", pending.taskId, pending.embedIndex, c_o, c_c, c_s, c_n)
 		} else {
-			logger.Logger.Infof("  CANCEL   | o%d c%d s%d n%d", c_o, c_c, c_s, c_n)
+			logger.Logger.Infof("  [%s-%d]CANCEL   | o%d c%d s%d n%d ❓", pending.taskId, pending.embedIndex, c_o, c_c, c_s, c_n)
 		}
 		return redirect.None, communityVotes, nil
 	}
 
 	if c_o > c_c && c_o > c_s {
-		if pending.guess == redirect.Original {
-			logger.Logger.Infof("  ORIGINAL | o%d c%d s%d n%d ✔️", c_o, c_c, c_s, c_n)
+		if pending.autoType == redirect.Original {
+			logger.Logger.Infof("  [%s-%d] ORIGINAL | o%d c%d s%d n%d ✔️", pending.taskId, pending.embedIndex, c_o, c_c, c_s, c_n)
 		} else {
-			logger.Logger.Infof("  ORIGINAL | o%d c%d s%d n%d", c_o, c_c, c_s, c_n)
+			logger.Logger.Infof("  [%s-%d] ORIGINAL | o%d c%d s%d n%d ❓", pending.taskId, pending.embedIndex, c_o, c_c, c_s, c_n)
 		}
 		rType = redirect.Original
 	}
 
 	if c_s > c_c && c_s > c_o {
-		if pending.guess == redirect.Stream {
-			logger.Logger.Infof("  STREAM   | o%d c%d s%d n%d ✔️", c_o, c_c, c_s, c_n)
+		if pending.autoType == redirect.Stream {
+			logger.Logger.Infof("  [%s-%d] STREAM   | o%d c%d s%d n%d ✔️", pending.taskId, pending.embedIndex, c_o, c_c, c_s, c_n)
 		} else {
-			logger.Logger.Infof("  STREAM   | o%d c%d s%d n%d", c_o, c_c, c_s, c_n)
+			logger.Logger.Infof("  [%s-%d] STREAM   | o%d c%d s%d n%d ❓", pending.taskId, pending.embedIndex, c_o, c_c, c_s, c_n)
 		}
 		rType = redirect.Stream
 	}
 
 	if c_c > c_s && c_c > c_o {
-		if pending.guess == redirect.Cover {
-			logger.Logger.Infof("  COVER    | o%d c%d s%d n%d ✔️", c_o, c_c, c_s, c_n)
+		if pending.autoType == redirect.Cover {
+			logger.Logger.Infof("  [%s-%d] COVER    | o%d c%d s%d n%d ✔️", pending.taskId, pending.embedIndex, c_o, c_c, c_s, c_n)
 		} else {
-			logger.Logger.Infof("  COVER    | o%d c%d s%d n%d", c_o, c_c, c_s, c_n)
+			logger.Logger.Infof("  [%s-%d] COVER    | o%d c%d s%d n%d ❓", pending.taskId, pending.embedIndex, c_o, c_c, c_s, c_n)
 		}
 		rType = redirect.Cover
 	}

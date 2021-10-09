@@ -17,10 +17,17 @@ var HELLO string
 var DETECTED string
 var DETECTED_MATCH_NONE string
 var DETECTED_UNKNOWN string
+var DETECTED_UNKNOWN_DUPLICATE string
 var DETECTED_CLIPS string
-var DETECTED_REDIRECTED string
+var DETECTED_CLIPS_DUPLICATE string
+var DETECTED_DUPLICATE string
+var DETECTED_DUPLICATE_NONE string
 var DETECTED_PRE_TYPED string
 var DETECTED_PRE_TYPED_AGREED string
+var DETECTED_PRE_TYPED_DUPLICATE string
+var DETECTED_PRE_TYPED_AGREED_DUPLICATE string
+var DETECTED_PRE_TYPED_NONE_DUPLICATE string
+var DETECTED_PRE_TYPED_NONE_AGREED_DUPLICATE string
 var BUTTON_ORIGINAL string
 var BUTTON_COVER string
 var BUTTON_NOT_SONG string
@@ -51,6 +58,8 @@ var EXPLAIN_EMBED_RESOLVE string
 var ACTIVITY string
 
 var USAGE string
+
+var HOT string
 
 func FromString (code string) Locale {
 	code = strings.ToLower(code)
@@ -84,13 +93,20 @@ func SetLanguage (lang Locale) {
 		BUTTON_NOT_SONG = "非歌曲"
 		BUTTON_ORIGINAL = "原創"
 		BUTTON_COVER = "翻唱"
-		DETECTED = "▶️ **%s**\n**(๑•̀ㅂ•́)و✧** 猜測為 *%s*，%.0f 秒後自動。可對此訊息投票修改分類：🇴 原創 / 🇨 翻唱 / 🇸 歌回 / ❌ 不轉發"
-		DETECTED_CLIPS = "▶️ **%s**\n**/ᐠ｡ꞈ｡ᐟ\\\\** 疑似剪輯，預設 ❌*不轉發*。%.0f 秒內可對此訊息投票修改分類：🇴 原創 / 🇨 翻唱 / 🇸 歌回 / ❌ 不轉發"
-		DETECTED_MATCH_NONE = "▶️ **%s**\n**( ˘•ω•˘ )** 標題不含關鍵字，預設 ❌*不轉發*。%.0f 秒內可對此訊息投票修改分類：🇴 原創 / 🇨 翻唱 / 🇸 歌回 / ❌ 不轉發"
-		DETECTED_UNKNOWN = "▶️ **%s**\n**(ﾟ∀。)** 瓦卡拉奈，預設 ❌*不轉發*。多拉 A 夢幫幫我！%.0f 秒內可對此訊息投票決定分類：🇴 原創 / 🇨 翻唱 / 🇸 歌回 / ❌ 不轉發"
-		DETECTED_REDIRECTED = "▶️ **%s**\n**( º﹃º｀ )** 猜測為 *%s*，但最近有轉發過，預設 ❌*不轉發*。%.0f 秒內可對此訊息投票修改分類：🇴 原創 / 🇨 翻唱 / 🇸 歌回 / ❌ 不轉發"
-		DETECTED_PRE_TYPED = "▶️ **%s**\n**(\\*゜ω゜)ゞ** 分享者建議為 *%s*，%.0f 秒後自動執行。可對此訊息投票修改分類：🇴 原創 / 🇨 翻唱 / 🇸 歌回 / ❌ 不轉發"
-		DETECTED_PRE_TYPED_AGREED = "▶️ **%s**\n**(\\*゜ω゜)ゞ** 分享者建議為 *%s*（而且我也這麼認為！）%.0f 秒後自動執行。可對此訊息投票修改分類：🇴 原創 / 🇨 翻唱 / 🇸 歌回 / ❌ 不轉發"
+		DETECTED =                                 "▶️ **%s**\n**(๑•̀ㅂ•́)و✧** 猜測為 *%s*，%.0f 秒後自動轉發。可對此訊息投票修改分類：🇴 原創 / 🇨 翻唱 / 🇸 歌回 / ❌ 不轉發"
+		DETECTED_CLIPS =                           "▶️ **%s**\n**/ᐠ｡ꞈ｡ᐟ\\\\** 疑似剪輯，預設 ❌*不轉發*。%.0f 秒內可對此訊息投票修改分類：🇴 原創 / 🇨 翻唱 / 🇸 歌回 / ❌ 不轉發"
+		DETECTED_MATCH_NONE =                      "▶️ **%s**\n**( ˘•ω•˘ )** 標題不含關鍵字，預設 ❌*不轉發*。%.0f 秒內可對此訊息投票修改分類：🇴 原創 / 🇨 翻唱 / 🇸 歌回 / ❌ 不轉發"
+		DETECTED_UNKNOWN =                         "▶️ **%s**\n**(ﾟ∀。)** 瓦卡拉奈，預設 ❌*不轉發*。多拉 A 夢幫幫我！%.0f 秒內可對此訊息投票決定分類：🇴 原創 / 🇨 翻唱 / 🇸 歌回 / ❌ 不轉發"
+		DETECTED_PRE_TYPED =                       "▶️ **%s**\n**(\\*゜ω゜)ゞ** 分享者建議為 *%s*，%.0f 秒後自動執行。可對此訊息投票修改分類：🇴 原創 / 🇨 翻唱 / 🇸 歌回 / ❌ 不轉發"
+		DETECTED_PRE_TYPED_AGREED =                "▶️ **%s**\n**(\\*゜ω゜)ゞ** 分享者建議為 *%s*（我也這麼認為！）%.0f 秒後自動執行。可對此訊息投票修改分類：🇴 原創 / 🇨 翻唱 / 🇸 歌回 / ❌ 不轉發"
+		DETECTED_PRE_TYPED_DUPLICATE =             "▶️ **%s**\n**(\\*゜ω゜)ゞ** 分享者建議了 *%s*，但**最近轉發過**（%s 前），預設 ❌*不轉發*。%.0f 秒內可對此訊息投票修改分類：🇴 原創 / 🇨 翻唱 / 🇸 歌回 / ❌ 不轉發"
+		DETECTED_CLIPS_DUPLICATE =                 "▶️ **%s**\n**/ᐠ｡ꞈ｡ᐟ\\\\** 疑似剪輯，預設 ❌*不轉發*，不過**最近轉發過**（%s 前）...%.0f 秒內可對此訊息投票修改分類：🇴 原創 / 🇨 翻唱 / 🇸 歌回 / ❌ 不轉發"
+		DETECTED_DUPLICATE =                       "▶️ **%s**\n**(･ω´･ )** 猜測為 *%s*，但**最近轉發過**（%s 前），預設 ❌*不轉發*。%.0f 秒內可對此訊息投票修改分類：🇴 原創 / 🇨 翻唱 / 🇸 歌回 / ❌ 不轉發"
+		DETECTED_UNKNOWN_DUPLICATE =               "▶️ **%s**\n**(･ω´･ )** 瓦卡拉奈，預設 ❌*不轉發*，不過**最近轉發過**（%s 前）...多拉 A 夢幫幫我！%.0f 秒內可對此訊息投票決定分類：🇴 原創 / 🇨 翻唱 / 🇸 歌回 / ❌ 不轉發"
+		DETECTED_DUPLICATE_NONE =                  "▶️ **%s**\n**(･ω´･ )** 猜測為 ❌*不轉發*，且**最近轉發過**（%s 前）...%.0f 秒內可對此訊息投票修改分類：🇴 原創 / 🇨 翻唱 / 🇸 歌回 / ❌ 不轉發"
+		DETECTED_PRE_TYPED_AGREED_DUPLICATE =      "▶️ **%s**\n**(･ω´･ )ゞ** 分享者建議了 *%s*（我也這麼認為！），但**最近轉發過**（%s 前），預設 ❌*不轉發*。%.0f 秒內可對此訊息投票修改分類：🇴 原創 / 🇨 翻唱 / 🇸 歌回 / ❌ 不轉發"
+		DETECTED_PRE_TYPED_NONE_DUPLICATE =        "▶️ **%s**\n**(･ω´･ )ゞ** 分享者建議 ❌*不轉發*，且**最近轉發過**（%s 前）...%.0f 秒內可對此訊息投票修改分類：🇴 原創 / 🇨 翻唱 / 🇸 歌回 / ❌ 不轉發"
+		DETECTED_PRE_TYPED_NONE_AGREED_DUPLICATE = "▶️ **%s**\n**(･ω´･ )ゞ** 分享者建議 ❌*不轉發*（我也這麼認為！），且**最近轉發過**（%s 前）...%.0f 秒內可對此訊息投票修改分類：🇴 原創 / 🇨 翻唱 / 🇸 歌回 / ❌ 不轉發"
 		C_DESC = "channel"
 		C_COVER_DESC = "翻唱歌曲頻道 ID"
 		C_ORIGINAL_DESC = "原創歌曲頻道 ID"
@@ -111,6 +127,7 @@ func SetLanguage (lang Locale) {
 		SMSG = "原文"
 		EXPLAIN_EMBED_RESOLVE = "（內嵌播放）"
 		ACTIVITY = "私訊 `/dm [頻道ID] [訊息ID]` 刪除我的訊息！"
+		HOT = "⬆️⬆️⬆️ 🔥大🔥熱🔥門🔥⎝༼ ◕д ◕ ༽⎠"
 		USAGE = `
 		
 		`

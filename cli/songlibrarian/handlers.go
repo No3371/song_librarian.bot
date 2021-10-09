@@ -26,6 +26,7 @@ func init () {
 }
 
 type mHandleSession struct {
+	rId string
 	cId discord.ChannelID
 	mId discord.MessageID
 	msg *discord.Message
@@ -52,6 +53,7 @@ func addEventHandlers (s *state.State) (err error){
 		atomic.AddUint64(&statSession.MessageEvents, 1)
 
 		buffer<-&mHandleSession{
+			rId: getRandomID(3),
 			cId: e.Message.ChannelID,
 			mId: e.Message.ID,
 		}
@@ -68,7 +70,7 @@ func handlerLoop (s *state.State) {
 		atomic.AddUint64(&statSession.MessageBuffered, 1)
 		item.msg, err = s.Message(item.cId, item.mId)
 		if item.msg == nil || err != nil {
-			logger.Logger.Infof("[HANDLER] Buffered item invalid. error? %v", err)
+			logger.Logger.Infof("[HANDLER] [%s] Buffered item invalid. error? %v", item.rId, err)
 			continue
 		}
 
@@ -78,7 +80,7 @@ func handlerLoop (s *state.State) {
 
 		if time.Now().Sub(item.msg.Timestamp.Time().Local()) < time.Second*2 {
 			<-fetchDelayTimer.C
-			fetchDelayTimer.Reset(time.Second * 2)
+			fetchDelayTimer.Reset(time.Second * 3)
 			item.msg, err = s.Message(item.cId, item.mId)
 			if len(item.msg.Embeds) == 0 {
 				atomic.AddUint64(&statSession.SecondFetchEmbeds0, 1)
@@ -87,7 +89,7 @@ func handlerLoop (s *state.State) {
 
 		err = onMessageCreated(s, item)
 		if err != nil {
-			logger.Logger.Errorf("[HANDLER] OnMessageCreated error: %v", err)
+			logger.Logger.Errorf("[HANDLER] [%s] OnMessageCreated error: %v", item.rId, err)
 		}
 	}
 
@@ -104,16 +106,16 @@ func onMessageCreated (s *state.State, task *mHandleSession) (err error) {
 		for bId := range bIds {
 			b := binding.QueryBinding(bId)
 			if b == nil {
-				logger.Logger.Errorf("A binding Id is pointing to nil Binding: %d", bId)
+				logger.Logger.Errorf("[%s] A binding Id is pointing to nil Binding: %d", task.rId, bId)
 				continue
 			}
 
 			if len(task.msg.Embeds) == 0 {
 				<-fetchDelayTimer.C
-				fetchDelayTimer.Reset(time.Second * 2)
+				fetchDelayTimer.Reset(time.Second * 3)
 				task.msg, err = s.Message(task.msg.ChannelID, task.msg.ID)
-				if task == nil || err != nil {
-					logger.Logger.Errorf("The message is gone!? Abort!\n%v", err)
+				if task.msg == nil || err != nil {
+					logger.Logger.Errorf("[%s] The message is gone!? Abort!\n%v (%s)", task.rId, err, )
 					return
 				}
 				if len(task.msg.Embeds) == 0 {
@@ -145,7 +147,7 @@ func onMessageCreated (s *state.State, task *mHandleSession) (err error) {
 								case "x":
 									task.setTypes = append(task.setTypes, redirect.None)
 									break
-								case "_":
+								default:
 									task.setTypes = append(task.setTypes, redirect.Unknown)
 									break
 								}
@@ -158,7 +160,7 @@ func onMessageCreated (s *state.State, task *mHandleSession) (err error) {
 			// Find all bindings bound
 			// For each binding, for each redirection, if the regex match...
 			for ei, e := range task.msg.Embeds {
-				logger.Logger.Infof("💬 %s (%s) / %d #%d", e.Title, e.URL, task.msg.ID, ei)
+				logger.Logger.Infof("💬 %s (%s) / %s-%d", e.Title, e.URL, task.rId, ei)
 				atomic.AddUint64(&statSession.AnalyzedEmbeds, 1)
 				urlMatching: for i := 0; i < urlRegexCount; i++ {
 					if b.UrlRegexEnabled(i) {
@@ -181,16 +183,24 @@ func onMessageCreated (s *state.State, task *mHandleSession) (err error) {
 	return nil
 }
 
-func pendEmbed (s *state.State, task *mHandleSession, eIndex int, bId int) error {
+func pendEmbed (s *state.State, task *mHandleSession, eIndex int, bId int) (err error) {
 	embed := task.msg.Embeds[eIndex]
+
 	var sendMessageData api.SendMessageData = api.SendMessageData{
 		Reference: &discord.MessageReference{ MessageID: task.msg.ID},
 	}
-	myGuess, err := guess(embed)
+	var autoType redirect.RedirectType
+
+	var dup bool
+	var lastPosted time.Time
+	lastPosted, dup = isDuplicate(embed.URL)
+	
+	autoType, err = guess(task, eIndex)
 	if err != nil {
 		logger.Logger.Errorf("  Guessing error: %v", err)
-		myGuess = redirect.Unknown
+		autoType = redirect.Unknown
 	}
+
 	var delay time.Duration = *globalFlags.delay
 
 	preType := redirect.Unknown
@@ -199,7 +209,7 @@ func pendEmbed (s *state.State, task *mHandleSession, eIndex int, bId int) error
 	}
 
 	if preType != redirect.Unknown { // If not UNKNOWN, accept the preype
-		var format, typeLocale string
+		var typeLocale string
 		switch preType {
 		case redirect.Original:
 			typeLocale = locale.ORIGINAL
@@ -219,51 +229,81 @@ func pendEmbed (s *state.State, task *mHandleSession, eIndex int, bId int) error
 			break
 		}
 
-		if myGuess == preType {
+		if dup {
+			delay = delay * 5 / 10
+			passed := time.Now().Sub(lastPosted).Round(time.Second)
+			if autoType == preType {
+				sendMessageData.Content = fmt.Sprintf(locale.DETECTED_PRE_TYPED_AGREED_DUPLICATE, embed.Title, typeLocale, passed, delay.Seconds())
+			} else {
+				sendMessageData.Content = fmt.Sprintf(locale.DETECTED_PRE_TYPED_DUPLICATE, embed.Title, typeLocale, passed, delay.Seconds())
+			}
+		} else if autoType == preType {
 			if preType == redirect.None {
 				delay = delay * 4 / 10			
 			} else {
 				delay = delay * 5 / 10
 			}
-			format = locale.DETECTED_PRE_TYPED_AGREED
+			sendMessageData.Content = fmt.Sprintf(locale.DETECTED_PRE_TYPED_AGREED, embed.Title, typeLocale, delay.Seconds())
 		} else {
 			if preType == redirect.None {
 				delay = delay * 4 / 10			
 			} else {
 				delay = delay * 7 / 10
 			}
-			format = locale.DETECTED_PRE_TYPED
+			sendMessageData.Content = fmt.Sprintf(locale.DETECTED_PRE_TYPED, embed.Title, typeLocale, delay.Seconds())
 		}
 
-		sendMessageData.Content = fmt.Sprintf(format, embed.Title, typeLocale, delay.Seconds())
 
 	} else {
-		switch myGuess {
-		case redirect.Original:
-			sendMessageData.Content = fmt.Sprintf(locale.DETECTED, embed.Title, locale.ORIGINAL, delay.Seconds())
-			break
-		case redirect.Cover:
-			sendMessageData.Content = fmt.Sprintf(locale.DETECTED, embed.Title, locale.COVER, delay.Seconds())
-			break
-		case redirect.Stream:
-			sendMessageData.Content = fmt.Sprintf(locale.DETECTED, embed.Title, locale.STREAM, delay.Seconds())
-			break
-		case redirect.None:
-			sendMessageData.Content = fmt.Sprintf(locale.DETECTED_MATCH_NONE, embed.Title, delay.Seconds())
-			break
-		case redirect.Unknown:
-			delay = delay * 3 / 2
-			sendMessageData.Content = fmt.Sprintf(locale.DETECTED_UNKNOWN, embed.Title, delay.Seconds())
-			break
-		case redirect.Clip:
-			sendMessageData.Content = fmt.Sprintf(locale.DETECTED_CLIPS, embed.Title, delay.Seconds())
-			myGuess = redirect.None
-			break
+		if dup {
+			passed := time.Now().Sub(lastPosted).Round(time.Second)
+			switch autoType {
+			case redirect.Original:
+					sendMessageData.Content = fmt.Sprintf(locale.DETECTED_DUPLICATE, embed.Title, locale.ORIGINAL, passed ,delay.Seconds())
+				break
+			case redirect.Cover:
+					sendMessageData.Content = fmt.Sprintf(locale.DETECTED_DUPLICATE, embed.Title, locale.COVER, passed, delay.Seconds())
+				break
+			case redirect.Stream:
+					sendMessageData.Content = fmt.Sprintf(locale.DETECTED_DUPLICATE, embed.Title, locale.STREAM, passed, delay.Seconds())
+				break
+			case redirect.None:
+					sendMessageData.Content = fmt.Sprintf(locale.DETECTED_DUPLICATE_NONE, embed.Title, passed, delay.Seconds())
+				break
+			case redirect.Unknown:
+					delay = delay * 3 / 2
+					sendMessageData.Content = fmt.Sprintf(locale.DETECTED_UNKNOWN_DUPLICATE, embed.Title, passed, delay.Seconds())
+				break
+			case redirect.Clip:
+					sendMessageData.Content = fmt.Sprintf(locale.DETECTED_CLIPS_DUPLICATE, embed.Title, passed, delay.Seconds())
+			}
+
+		} else {
+			switch autoType {
+			case redirect.Original:
+					sendMessageData.Content = fmt.Sprintf(locale.DETECTED, embed.Title, locale.ORIGINAL, delay.Seconds())
+			case redirect.Cover:
+					sendMessageData.Content = fmt.Sprintf(locale.DETECTED, embed.Title, locale.COVER, delay.Seconds())
+				break
+			case redirect.Stream:
+					sendMessageData.Content = fmt.Sprintf(locale.DETECTED, embed.Title, locale.STREAM, delay.Seconds())
+				break
+			case redirect.None:
+					sendMessageData.Content = fmt.Sprintf(locale.DETECTED_MATCH_NONE, embed.Title, delay.Seconds())
+				break
+			case redirect.Unknown:
+					sendMessageData.Content = fmt.Sprintf(locale.DETECTED_UNKNOWN, embed.Title, delay.Seconds())
+				break
+			case redirect.Clip:
+					sendMessageData.Content = fmt.Sprintf(locale.DETECTED_CLIPS, embed.Title, delay.Seconds())
+					autoType = redirect.None
+			}
+
 		}
 	}
 	botM, err := s.SendMessageComplex(task.msg.ChannelID, sendMessageData)
 	if err != nil {
-		logger.Logger.Errorf("%v", fmt.Errorf("%w", err))
+		logger.Logger.Errorf("[%s-%d] %v", task.rId, eIndex, err)
 		return err
 	}
 
@@ -306,23 +346,25 @@ func pendEmbed (s *state.State, task *mHandleSession, eIndex int, bId int) error
 	// 	log.Printf("[Error] %s", fmt.Errorf("%w", err))
 	// 	return err
 	// }
-	logger.Logger.Infof("  Pending %d #%d...", task.msg.ID, eIndex)
 	pendingEmbeds<-&pendingEmbed{
 		cId: botM.ChannelID,
 		msgID: botM.ID,
 		embedIndex: eIndex,
 		urlValidation: task.msg.Embeds[eIndex].URL,
+		taskId: task.rId,
 		bindingId: bId,
 		estimatedRTime: time.Now().Add(delay),
-		guess: myGuess,
+		autoType: autoType,
 		preType: preType,
+		isDup: dup,
 	}
 
 	return nil
 }
 
 
-func guess (embed discord.Embed) (redirectType redirect.RedirectType, err error) {
+func guess (task *mHandleSession, eIndex int) (redirectType redirect.RedirectType, err error) {
+	embed := task.msg.Embeds[eIndex]
 	defer func () {
 		if redirectType == redirect.None || redirectType == redirect.Unknown || redirectType == redirect.Clip {
 			return
@@ -343,6 +385,7 @@ func guess (embed discord.Embed) (redirectType redirect.RedirectType, err error)
 	var countC = 0
 	var countNotC = 0
 	var countS = 0
+	var countNotS = 0
 
 	sb := &strings.Builder{}
 
@@ -383,11 +426,11 @@ func guess (embed discord.Embed) (redirectType redirect.RedirectType, err error)
 	}
 
 	if countC + countO + countS == 0 {
-		logger.Logger.Infof("  [GUESS] o%d c%d s%d", countO, countC, countS)
+		logger.Logger.Infof("  [GUESS-%s-%d] o%d c%d s%d", task.rId, eIndex, countO, countC, countS)
 		return redirect.None, nil
 	} else {
-		logger.Logger.Infof("  [GUESS] %s", sb.String())
-		logger.Logger.Infof("  [GUESS] o%d(-%d) c%d(-%d) s%d", countO, countNotO, countC, countNotC, countS)
+		logger.Logger.Infof("  [GUESS-%s-%d] %s", task.rId, eIndex, sb.String())
+		logger.Logger.Infof("  [GUESS-%s-%d] o%d(-%d) c%d(-%d) s%d", task.rId, eIndex, countO, countNotO, countC, countNotC, countS)
 	}
 
 
