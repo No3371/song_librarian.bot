@@ -65,7 +65,9 @@ func main() {
 	resolveFlags()
 	logger.SetupLogger(!*globalFlags.dev)
 	locale.SetLanguage(locale.FromString(*globalFlags.locale))
-	statSession = &stats{}
+	statSession = &stats{
+		StartAt: time.Now(),
+	}
 
 	if *globalFlags.dev {
         f, err := os.Create("./cpuprof")

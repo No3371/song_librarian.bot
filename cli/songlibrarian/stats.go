@@ -3,9 +3,11 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"time"
 )
 
 type stats struct {
+	StartAt			   time.Time
 	MessageEvents      uint64
 	MessageBuffered    uint64
 	FirstFetchEmbeds0  uint64
@@ -26,5 +28,6 @@ func (s *stats) Print() {
 	if err != nil {
 		j = []byte("Failed to marshal")
 	}
+	fmt.Printf("Has been running for %s...", time.Now().Sub(statSession.StartAt).Round(time.Second))
 	fmt.Printf("\n[STATS] Redirect rate: %0.2f%%\n%s\n", 100*(float64(statSession.Redirected)/float64(statSession.AnalyzedEmbeds)), string(j))
 }
