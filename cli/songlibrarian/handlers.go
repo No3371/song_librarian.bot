@@ -381,7 +381,7 @@ func guess (task *mHandleSession, eIndex int) (redirectType redirect.RedirectTyp
 		}
 
 		if redirectType == redirect.Stream {
-			logger.Logger.Infof("The stream has timestamp of %v", task.msg.Embeds[eIndex].Timestamp)
+			logger.Logger.Infof("The stream has timestamp of %s", embed.Timestamp)
 		}
 
 	} ()
