@@ -385,6 +385,28 @@ func guess (task *mHandleSession, eIndex int) (redirectType redirect.RedirectTyp
 		}
 
 	} ()
+	
+	sb := &strings.Builder{}
+
+	var m *regexp2.Match
+	m, err = regexNamedCover.FindStringMatch(embed.Title)
+	if err != nil {
+		logger.Logger.Errorf("Failed to match for NamedCover keywords: %v", err)
+		return redirect.Unknown, err
+	} else if m != nil {
+		logger.Logger.Infof("  Matched named cover: %s", m)
+		return redirect.Cover, nil
+	}
+
+	m, err = regexNamedStream.FindStringMatch(embed.Title)
+	if err != nil {
+		logger.Logger.Errorf("Failed to match for NamedStream keywords: %v", err)
+		return redirect.Unknown, err
+	} else if m != nil {
+		logger.Logger.Infof("  Matched named cover: %s", m)
+		return redirect.Stream, nil
+	}
+
 	var countO = 0
 	var countNotO = 0
 	var countC = 0
@@ -392,7 +414,6 @@ func guess (task *mHandleSession, eIndex int) (redirectType redirect.RedirectTyp
 	var countS = 0
 	var countNotS = 0
 
-	sb := &strings.Builder{}
 
 	countC, err = countMatch(sb, "Cover", regexCover_s0, embed.Title)
 	if err != nil {
