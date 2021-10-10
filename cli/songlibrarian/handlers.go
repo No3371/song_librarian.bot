@@ -431,11 +431,11 @@ func guess (task *mHandleSession, eIndex int) (redirectType redirect.RedirectTyp
 	}
 
 	if countC + countO + countS == 0 {
-		logger.Logger.Infof("  [GUESS-%s-%d] o%d c%d s%d", task.rId, eIndex, countO, countC, countS)
+		logger.Logger.Infof("  [GUESS-%s-%d] o%d c%d s%d(-%d)", task.rId, eIndex, countO, countC, countS, countNotS)
 		return redirect.None, nil
 	} else {
 		logger.Logger.Infof("  [GUESS-%s-%d] %s", task.rId, eIndex, sb.String())
-		logger.Logger.Infof("  [GUESS-%s-%d] o%d(-%d) c%d(-%d) s%d", task.rId, eIndex, countO, countNotO, countC, countNotC, countS)
+		logger.Logger.Infof("  [GUESS-%s-%d] o%d(-%d) c%d(-%d) s%d(-%d)", task.rId, eIndex, countO, countNotO, countC, countNotC, countS, countNotS)
 	}
 
 
