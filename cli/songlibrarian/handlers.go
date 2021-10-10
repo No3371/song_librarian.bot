@@ -379,6 +379,11 @@ func guess (task *mHandleSession, eIndex int) (redirectType redirect.RedirectTyp
 			logger.Logger.Infof("  [GUESS] Wait! The author looks like a clipping channel!")
 			redirectType = redirect.Clip
 		}
+
+		if redirectType == redirect.Stream {
+			logger.Logger.Infof("The stream has timestamp of %v", task.msg.Embeds[eIndex].Timestamp)
+		}
+
 	} ()
 	var countO = 0
 	var countNotO = 0
