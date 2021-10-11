@@ -210,26 +210,26 @@ func pendEmbed (s *state.State, task *mHandleSession, eIndex int, bId int) (err 
 
 	if preType != redirect.Unknown { // If not UNKNOWN, accept the preype
 		var typeLocale string
-		switch preType {
-		case redirect.Original:
-			typeLocale = locale.ORIGINAL
-			logger.Logger.Infof("  pre_typed: o" )
-			break
-		case redirect.Cover:
-			typeLocale = locale.COVER
-			logger.Logger.Infof("  pre_typed: c" )
-			break
-		case redirect.Stream:
-			typeLocale = locale.STREAM
-			logger.Logger.Infof("  pre_typed: s" )
-			break
-		case redirect.None:
-			typeLocale = locale.DO_NOT_REDIRECT
-			logger.Logger.Infof("  pre_typed: x" )
-			break
-		}
 
 		if dup {
+			switch preType { 
+			case redirect.Original:
+				typeLocale = locale.ORIGINAL_UNSIGNED // UNSIGNED
+				logger.Logger.Infof("  pre_typed: o" )
+				break
+			case redirect.Cover:
+				typeLocale = locale.COVER_UNSIGNED // UNSIGNED
+				logger.Logger.Infof("  pre_typed: c" )
+				break
+			case redirect.Stream:
+				typeLocale = locale.STREAM_UNSIGNED // UNSIGNED
+				logger.Logger.Infof("  pre_typed: s" )
+				break
+			case redirect.None:
+				typeLocale = locale.DO_NOT_REDIRECT
+				logger.Logger.Infof("  pre_typed: x" )
+				break
+			}
 			delay = delay * 5 / 10
 			passed := time.Now().Sub(lastPosted).Round(time.Second)
 			if autoType == preType {
@@ -237,20 +237,40 @@ func pendEmbed (s *state.State, task *mHandleSession, eIndex int, bId int) (err 
 			} else {
 				sendMessageData.Content = fmt.Sprintf(locale.DETECTED_PRE_TYPED_DUPLICATE, embed.Title, typeLocale, passed, delay.Seconds())
 			}
-		} else if autoType == preType {
-			if preType == redirect.None {
-				delay = delay * 4 / 10			
-			} else {
-				delay = delay * 5 / 10
-			}
-			sendMessageData.Content = fmt.Sprintf(locale.DETECTED_PRE_TYPED_AGREED, embed.Title, typeLocale, delay.Seconds())
 		} else {
-			if preType == redirect.None {
-				delay = delay * 4 / 10			
-			} else {
-				delay = delay * 7 / 10
+			switch preType {
+			case redirect.Original:
+				typeLocale = locale.ORIGINAL
+				logger.Logger.Infof("  pre_typed: o" )
+				break
+			case redirect.Cover:
+				typeLocale = locale.COVER
+				logger.Logger.Infof("  pre_typed: c" )
+				break
+			case redirect.Stream:
+				typeLocale = locale.STREAM
+				logger.Logger.Infof("  pre_typed: s" )
+				break
+			case redirect.None:
+				typeLocale = locale.DO_NOT_REDIRECT
+				logger.Logger.Infof("  pre_typed: x" )
+				break
 			}
-			sendMessageData.Content = fmt.Sprintf(locale.DETECTED_PRE_TYPED, embed.Title, typeLocale, delay.Seconds())
+			if autoType == preType {
+				if preType == redirect.None {
+					delay = delay * 3 / 10			
+				} else {
+					delay = delay * 5 / 10
+				}
+				sendMessageData.Content = fmt.Sprintf(locale.DETECTED_PRE_TYPED_AGREED, embed.Title, typeLocale, delay.Seconds())
+			} else {
+				if preType == redirect.None {
+					delay = delay * 4 / 10			
+				} else {
+					delay = delay * 7 / 10
+				}
+				sendMessageData.Content = fmt.Sprintf(locale.DETECTED_PRE_TYPED, embed.Title, typeLocale, delay.Seconds())
+			}
 		}
 
 
@@ -259,13 +279,13 @@ func pendEmbed (s *state.State, task *mHandleSession, eIndex int, bId int) (err 
 			passed := time.Now().Sub(lastPosted).Round(time.Second)
 			switch autoType {
 			case redirect.Original:
-					sendMessageData.Content = fmt.Sprintf(locale.DETECTED_DUPLICATE, embed.Title, locale.ORIGINAL, passed ,delay.Seconds())
+					sendMessageData.Content = fmt.Sprintf(locale.DETECTED_DUPLICATE, embed.Title, locale.ORIGINAL_UNSIGNED, passed ,delay.Seconds())
 				break
 			case redirect.Cover:
-					sendMessageData.Content = fmt.Sprintf(locale.DETECTED_DUPLICATE, embed.Title, locale.COVER, passed, delay.Seconds())
+					sendMessageData.Content = fmt.Sprintf(locale.DETECTED_DUPLICATE, embed.Title, locale.COVER_UNSIGNED, passed, delay.Seconds())
 				break
 			case redirect.Stream:
-					sendMessageData.Content = fmt.Sprintf(locale.DETECTED_DUPLICATE, embed.Title, locale.STREAM, passed, delay.Seconds())
+					sendMessageData.Content = fmt.Sprintf(locale.DETECTED_DUPLICATE, embed.Title, locale.STREAM_UNSIGNED, passed, delay.Seconds())
 				break
 			case redirect.None:
 					sendMessageData.Content = fmt.Sprintf(locale.DETECTED_DUPLICATE_NONE, embed.Title, passed, delay.Seconds())
@@ -381,7 +401,7 @@ func guess (task *mHandleSession, eIndex int) (redirectType redirect.RedirectTyp
 		}
 
 		if redirectType == redirect.Stream {
-			logger.Logger.Infof("The stream has timestamp of %s", embed.Timestamp)
+			logger.Logger.Infof("The stream has timestamp of %s", embed.Timestamp.Time())
 		}
 
 	} ()

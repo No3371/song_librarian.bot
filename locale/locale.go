@@ -39,6 +39,9 @@ var C_DELETE_ID_DESC string
 var ORIGINAL string
 var COVER    string
 var STREAM    string
+var ORIGINAL_UNSIGNED string
+var COVER_UNSIGNED    string
+var STREAM_UNSIGNED    string
 var DO_NOT_REDIRECT string
 
 var SHARER string
@@ -99,20 +102,23 @@ func SetLanguage (lang Locale) {
 		DETECTED_UNKNOWN =                         "▶️ **%s**\n**(ﾟ∀。)** 瓦卡拉奈，預設 ❌*不轉發*。多拉 A 夢幫幫我！%.0f 秒內可對此訊息投票決定分類：🇴 原創 / 🇨 翻唱 / 🇸 歌回 / ❌ 不轉發"
 		DETECTED_PRE_TYPED =                       "▶️ **%s**\n**(\\*゜ω゜)ゞ** 分享者建議為 *%s*，%.0f 秒後自動執行。可對此訊息投票修改分類：🇴 原創 / 🇨 翻唱 / 🇸 歌回 / ❌ 不轉發"
 		DETECTED_PRE_TYPED_AGREED =                "▶️ **%s**\n**(\\*゜ω゜)ゞ** 分享者建議為 *%s*（我也這麼認為！）%.0f 秒後自動執行。可對此訊息投票修改分類：🇴 原創 / 🇨 翻唱 / 🇸 歌回 / ❌ 不轉發"
-		DETECTED_PRE_TYPED_DUPLICATE =             "▶️ **%s**\n**(\\*゜ω゜)ゞ** 分享者建議了 *%s*，但**最近轉發過**（%s 前），預設 ❌*不轉發*。%.0f 秒內可對此訊息投票修改分類：🇴 原創 / 🇨 翻唱 / 🇸 歌回 / ❌ 不轉發"
-		DETECTED_CLIPS_DUPLICATE =                 "▶️ **%s**\n**/ᐠ｡ꞈ｡ᐟ\\\\** 疑似剪輯，預設 ❌*不轉發*，不過**最近轉發過**（%s 前）...%.0f 秒內可對此訊息投票修改分類：🇴 原創 / 🇨 翻唱 / 🇸 歌回 / ❌ 不轉發"
-		DETECTED_DUPLICATE =                       "▶️ **%s**\n**(･ω´･ )** 猜測為 *%s*，但**最近轉發過**（%s 前），預設 ❌*不轉發*。%.0f 秒內可對此訊息投票修改分類：🇴 原創 / 🇨 翻唱 / 🇸 歌回 / ❌ 不轉發"
-		DETECTED_UNKNOWN_DUPLICATE =               "▶️ **%s**\n**(･ω´･ )** 瓦卡拉奈，預設 ❌*不轉發*，不過**最近轉發過**（%s 前）...多拉 A 夢幫幫我！%.0f 秒內可對此訊息投票決定分類：🇴 原創 / 🇨 翻唱 / 🇸 歌回 / ❌ 不轉發"
-		DETECTED_DUPLICATE_NONE =                  "▶️ **%s**\n**(･ω´･ )** 猜測為 ❌*不轉發*，且**最近轉發過**（%s 前）...%.0f 秒內可對此訊息投票修改分類：🇴 原創 / 🇨 翻唱 / 🇸 歌回 / ❌ 不轉發"
-		DETECTED_PRE_TYPED_AGREED_DUPLICATE =      "▶️ **%s**\n**(･ω´･ )ゞ** 分享者建議了 *%s*（我也這麼認為！），但**最近轉發過**（%s 前），預設 ❌*不轉發*。%.0f 秒內可對此訊息投票修改分類：🇴 原創 / 🇨 翻唱 / 🇸 歌回 / ❌ 不轉發"
-		DETECTED_PRE_TYPED_NONE_DUPLICATE =        "▶️ **%s**\n**(･ω´･ )ゞ** 分享者建議 ❌*不轉發*，且**最近轉發過**（%s 前）...%.0f 秒內可對此訊息投票修改分類：🇴 原創 / 🇨 翻唱 / 🇸 歌回 / ❌ 不轉發"
-		DETECTED_PRE_TYPED_NONE_AGREED_DUPLICATE = "▶️ **%s**\n**(･ω´･ )ゞ** 分享者建議 ❌*不轉發*（我也這麼認為！），且**最近轉發過**（%s 前）...%.0f 秒內可對此訊息投票修改分類：🇴 原創 / 🇨 翻唱 / 🇸 歌回 / ❌ 不轉發"
+		DETECTED_PRE_TYPED_DUPLICATE =             "▶️ **%s**\n**(･ω´･ )** 分享者建議了 *%s*，但**%s 前轉發過**，預設 ❌*不轉發*。%.0f 秒內可對此訊息投票修改分類：🇴 原創 / 🇨 翻唱 / 🇸 歌回 / ❌ 不轉發"
+		DETECTED_CLIPS_DUPLICATE =                 "▶️ **%s**\n**(･ω´･ )** 疑似剪輯，預設 ❌*不轉發*，不過**%s 前轉發過**...%.0f 秒內可對此訊息投票修改分類：🇴 原創 / 🇨 翻唱 / 🇸 歌回 / ❌ 不轉發"
+		DETECTED_DUPLICATE =                       "▶️ **%s**\n**(･ω´･ )** 猜測為 *%s*，但**%s 前轉發過**，預設 ❌*不轉發*。%.0f 秒內可對此訊息投票修改分類：🇴 原創 / 🇨 翻唱 / 🇸 歌回 / ❌ 不轉發"
+		DETECTED_UNKNOWN_DUPLICATE =               "▶️ **%s**\n**(･ω´･ )** 瓦卡拉奈，預設 ❌*不轉發*，不過**%s 前轉發過**...多拉 A 夢幫幫我！%.0f 秒內可對此訊息投票決定分類：🇴 原創 / 🇨 翻唱 / 🇸 歌回 / ❌ 不轉發"
+		DETECTED_DUPLICATE_NONE =                  "▶️ **%s**\n**(･ω´･ )** 猜測為 ❌*不轉發*，且**%s 前轉發過**...%.0f 秒內可對此訊息投票修改分類：🇴 原創 / 🇨 翻唱 / 🇸 歌回 / ❌ 不轉發"
+		DETECTED_PRE_TYPED_AGREED_DUPLICATE =      "▶️ **%s**\n**(･ω´･ )ゞ** 分享者建議了 *%s*（我也這麼認為！），但**%s 前轉發過**，預設 ❌*不轉發*。%.0f 秒內可對此訊息投票修改分類：🇴 原創 / 🇨 翻唱 / 🇸 歌回 / ❌ 不轉發"
+		DETECTED_PRE_TYPED_NONE_DUPLICATE =        "▶️ **%s**\n**(･ω´･ )ゞ** 分享者建議 ❌*不轉發*，且**%s 前轉發過**...%.0f 秒內可對此訊息投票修改分類：🇴 原創 / 🇨 翻唱 / 🇸 歌回 / ❌ 不轉發"
+		DETECTED_PRE_TYPED_NONE_AGREED_DUPLICATE = "▶️ **%s**\n**(･ω´･ )ゞ** 分享者建議 ❌*不轉發*（我也這麼認為！），且**%s 前轉發過**...%.0f 秒內可對此訊息投票修改分類：🇴 原創 / 🇨 翻唱 / 🇸 歌回 / ❌ 不轉發"
 		C_DESC = "channel"
 		C_COVER_DESC = "翻唱歌曲頻道 ID"
 		C_ORIGINAL_DESC = "原創歌曲頻道 ID"
 		ORIGINAL = "🇴 原創"
 		COVER = "🇨 翻唱"
 		STREAM = "🇸 歌回"
+		ORIGINAL_UNSIGNED = "原創"
+		COVER_UNSIGNED = "翻唱"
+		STREAM_UNSIGNED = "歌回"
 		DO_NOT_REDIRECT = "❌不轉發"
 		SHARER = "分享者"
 		DECISION_TYPE = "判定"
