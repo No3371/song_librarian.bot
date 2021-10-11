@@ -82,6 +82,14 @@ func handlerLoop (s *state.State) {
 			<-fetchDelayTimer.C
 			fetchDelayTimer.Reset(time.Second * 3)
 			item.msg, err = s.Message(item.cId, item.mId)
+			if err != nil || item.msg == nil {
+				logger.Logger.Errorf("[%s] Retrying because failed to fetch message: %v", item.rId, err)
+				item.msg, err = s.Message(item.cId, item.mId)
+				if err != nil || item.msg == nil {
+					logger.Logger.Errorf("[%s] Retry failed too, ABORT: %v", item.rId, err)
+					continue
+				}
+			}
 			if len(item.msg.Embeds) == 0 {
 				atomic.AddUint64(&statSession.SecondFetchEmbeds0, 1)
 			}
@@ -191,10 +199,20 @@ func pendEmbed (s *state.State, task *mHandleSession, eIndex int, bId int) (err 
 	}
 	var autoType redirect.RedirectType
 
-	var dup bool
-	var lastPosted time.Time
-	lastPosted, dup = isDuplicate(embed.URL)
+	var lastProcessedTime, lastSharedTime, lastRedirectTime, lastResultTime time.Time
+	var lastMem memState
+	lastMem, lastResultTime = getLastState(embed.URL)
+	_, lastSharedTime = getLastShared(embed.URL)
+	_, lastRedirectTime = getLastRedirected(embed.URL)
+	_, lastProcessedTime = getLastResult(embed.URL)
+	logger.Logger.Infof("  [%s] Memory: %s (%s) | %d", task.rId, memStateToString(lastMem), lastResultTime.Sub(time.Now()), memPointer)
 	
+	var redirectedRecently bool = false
+	if (lastMem == Redirected || lastMem == Cancelled) && time.Now().Sub(lastRedirectTime) < time.Hour * 24 {
+		redirectedRecently = true
+	}
+	
+
 	autoType, err = guess(task, eIndex)
 	if err != nil {
 		logger.Logger.Errorf("  Guessing error: %v", err)
@@ -211,7 +229,7 @@ func pendEmbed (s *state.State, task *mHandleSession, eIndex int, bId int) (err 
 	if preType != redirect.Unknown { // If not UNKNOWN, accept the preype
 		var typeLocale string
 
-		if dup {
+		if redirectedRecently {
 			switch preType { 
 			case redirect.Original:
 				typeLocale = locale.ORIGINAL_UNSIGNED // UNSIGNED
@@ -231,7 +249,7 @@ func pendEmbed (s *state.State, task *mHandleSession, eIndex int, bId int) (err 
 				break
 			}
 			delay = delay * 5 / 10
-			passed := time.Now().Sub(lastPosted).Round(time.Second)
+			passed := time.Now().Sub(lastResultTime).Round(time.Second)
 			if autoType == preType {
 				sendMessageData.Content = fmt.Sprintf(locale.DETECTED_PRE_TYPED_AGREED_DUPLICATE, embed.Title, typeLocale, passed, delay.Seconds())
 			} else {
@@ -275,27 +293,30 @@ func pendEmbed (s *state.State, task *mHandleSession, eIndex int, bId int) (err 
 
 
 	} else {
-		if dup {
-			passed := time.Now().Sub(lastPosted).Round(time.Second)
+		passed := time.Now().Sub(lastResultTime).Round(time.Second)
+		if redirectedRecently {
 			switch autoType {
 			case redirect.Original:
-					sendMessageData.Content = fmt.Sprintf(locale.DETECTED_DUPLICATE, embed.Title, locale.ORIGINAL_UNSIGNED, passed ,delay.Seconds())
+				delay = delay / 2
+				sendMessageData.Content = fmt.Sprintf(locale.DETECTED_DUPLICATE, embed.Title, locale.ORIGINAL_UNSIGNED, passed ,delay.Seconds())
 				break
 			case redirect.Cover:
-					sendMessageData.Content = fmt.Sprintf(locale.DETECTED_DUPLICATE, embed.Title, locale.COVER_UNSIGNED, passed, delay.Seconds())
+				delay = delay / 2
+				sendMessageData.Content = fmt.Sprintf(locale.DETECTED_DUPLICATE, embed.Title, locale.COVER_UNSIGNED, passed, delay.Seconds())
 				break
 			case redirect.Stream:
-					sendMessageData.Content = fmt.Sprintf(locale.DETECTED_DUPLICATE, embed.Title, locale.STREAM_UNSIGNED, passed, delay.Seconds())
+				delay = delay / 2
+				sendMessageData.Content = fmt.Sprintf(locale.DETECTED_DUPLICATE, embed.Title, locale.STREAM_UNSIGNED, passed, delay.Seconds())
 				break
 			case redirect.None:
-					sendMessageData.Content = fmt.Sprintf(locale.DETECTED_DUPLICATE_NONE, embed.Title, passed, delay.Seconds())
+				sendMessageData.Content = fmt.Sprintf(locale.DETECTED_DUPLICATE_NONE, embed.Title, passed, delay.Seconds())
 				break
 			case redirect.Unknown:
-					delay = delay * 3 / 2
-					sendMessageData.Content = fmt.Sprintf(locale.DETECTED_UNKNOWN_DUPLICATE, embed.Title, passed, delay.Seconds())
+				delay = delay * 3 / 2
+				sendMessageData.Content = fmt.Sprintf(locale.DETECTED_UNKNOWN_DUPLICATE, embed.Title, passed, delay.Seconds())
 				break
 			case redirect.Clip:
-					sendMessageData.Content = fmt.Sprintf(locale.DETECTED_CLIPS_DUPLICATE, embed.Title, passed, delay.Seconds())
+				sendMessageData.Content = fmt.Sprintf(locale.DETECTED_CLIPS_DUPLICATE, embed.Title, passed, delay.Seconds())
 			}
 
 		} else {
@@ -309,17 +330,38 @@ func pendEmbed (s *state.State, task *mHandleSession, eIndex int, bId int) (err 
 					sendMessageData.Content = fmt.Sprintf(locale.DETECTED, embed.Title, locale.STREAM, delay.Seconds())
 				break
 			case redirect.None:
+				if lastMem == Cancelled {
+					delay = delay / 2
+					sendMessageData.Content = fmt.Sprintf(locale.DETECTED_MATCH_NONE_AND_CANCELLED, embed.Title, passed, delay.Seconds())
+				} else if lastMem > None && lastProcessedTime.Before(lastSharedTime) {
+					delay = delay * 2 / 3
+					passed = time.Now().Sub(lastSharedTime).Round(time.Second)
+					sendMessageData.Content = fmt.Sprintf(locale.DETECTED_MATCH_NONE_AND_SHARED, embed.Title, passed, delay.Seconds())
+				} else {
 					sendMessageData.Content = fmt.Sprintf(locale.DETECTED_MATCH_NONE, embed.Title, delay.Seconds())
+				}
 				break
 			case redirect.Unknown:
 					sendMessageData.Content = fmt.Sprintf(locale.DETECTED_UNKNOWN, embed.Title, delay.Seconds())
 				break
 			case redirect.Clip:
+				if lastMem == Cancelled {
+					delay = delay / 3
+					sendMessageData.Content = fmt.Sprintf(locale.DETECTED_CLIPS_AND_CANCELLED, embed.Title, passed, delay.Seconds())
+				} else {
 					sendMessageData.Content = fmt.Sprintf(locale.DETECTED_CLIPS, embed.Title, delay.Seconds())
-					autoType = redirect.None
+				}
+				autoType = redirect.None
 			}
 
 		}
+	}
+
+	if *globalFlags.dev {
+		delay /= 4
+	}
+	if err = memorizeShared(embed.URL); err != nil {
+		logger.Logger.Errorf("  [%s] Failed to memorizedPended: %v", task.rId, err)
 	}
 	botM, err := s.SendMessageComplex(task.msg.ChannelID, sendMessageData)
 	if err != nil {
@@ -376,7 +418,11 @@ func pendEmbed (s *state.State, task *mHandleSession, eIndex int, bId int) (err 
 		estimatedRTime: time.Now().Add(delay),
 		autoType: autoType,
 		preType: preType,
-		isDup: dup,
+		isDup: redirectedRecently,
+	}
+
+	if err = memorizePended(embed.URL); err != nil {
+		logger.Logger.Errorf("  [%s] Failed to memorizedPended: %v", task.rId, err)
 	}
 
 	return nil
@@ -398,10 +444,6 @@ func guess (task *mHandleSession, eIndex int) (redirectType redirect.RedirectTyp
 		if likeAClip, _ := regexClips.MatchString(embed.Author.Name); likeAClip {
 			logger.Logger.Infof("  [GUESS] Wait! The author looks like a clipping channel!")
 			redirectType = redirect.Clip
-		}
-
-		if redirectType == redirect.Stream {
-			logger.Logger.Infof("The stream has timestamp of %s", embed.Timestamp.Time())
 		}
 
 	} ()
@@ -493,7 +535,7 @@ func guess (task *mHandleSession, eIndex int) (redirectType redirect.RedirectTyp
 	}
 
 	if countO > countC && countO > countS {
-		if countC > 0 && countO < 3 {
+		if countC > 0 && countO < 3 { // If there's a keywork of Cover, it's very unlikely it'd be Original
 			return redirect.Cover, nil
 		}
 		return redirect.Original, nil
@@ -501,6 +543,10 @@ func guess (task *mHandleSession, eIndex int) (redirectType redirect.RedirectTyp
 
 	if countS > countO && countS > countC {
 		return redirect.Stream, nil
+	}
+
+	if countC > 0 && countS > 0 && countC >= countS{ // If it looks like a stream or cover, Cover is prefered (Usually, a stream is not titled with keyword of Cover)
+		return redirect.Cover, nil
 	}
 
 	return redirect.Unknown, nil

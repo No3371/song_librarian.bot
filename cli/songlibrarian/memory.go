@@ -4,63 +4,204 @@ import (
 	"sync"
 	"time"
 
-	"No3371.github.com/song_librarian.bot/logger"
 )
 
-const MEM_SIZE = 64
 
-var redirectedMap map[string]memory
-var redirectedUrls [MEM_SIZE]string
+type memState int 
+
+const (
+	None memState = iota
+	Shared 
+	Pended
+	Redirected
+	Cancelled
+	CancelledWithError
+)
+
+const MEM_SIZE = 256
+
+var urlMap map[string]*memory
+var urls [MEM_SIZE]string
 var memPointer int
 var lock *sync.RWMutex
 
 type memory struct {
 	index int
-	markedAt time.Time
+	latestState memState
+	cancelledAt time.Time
+	redirectedAt time.Time
+	sharedAt time.Time
+	pendedAt time.Time
 }
 
 
 
 func init() {
-	redirectedMap = make(map[string]memory, MEM_SIZE)
-	redirectedUrls = [MEM_SIZE]string {}
+	urlMap = make(map[string]*memory, MEM_SIZE)
+	urls = [MEM_SIZE]string {}
 	lock = new(sync.RWMutex)
 }
 
-func isDuplicate(url string) (last time.Time, redirected bool) {
+func getLastState (url string) (state memState, ts time.Time) {
 	lock.RLock()
 	defer lock.RUnlock()
-	item, redirected := redirectedMap[url]
-	last = item.markedAt
+	var inMem bool
+	var mem *memory
+	if mem, inMem = urlMap[url]; inMem {
+		state = mem.latestState
+		ts = mem.sharedAt
+	} else {
+		state = None
+	}
+	return
+
+}
+
+func getLastShared (url string) (state memState, ts time.Time) {
+	lock.RLock()
+	defer lock.RUnlock()
+	var inMem bool
+	var mem *memory
+	if mem, inMem = urlMap[url]; inMem {
+		state = mem.latestState
+		ts = mem.sharedAt
+	} else {
+		state = None
+	}
 	return
 }
 
-func markRedirected(url string) (err error) {
-	defer func () {
-		if p := recover(); p != nil {
-			if err != nil {
-				logger.Logger.Errorf("Error when marking redirected: %v", err)
-			}
-			err = p.(error)
-			logger.Logger.Errorf("Error when marking redirected: %v", err)
+func getLastResult (url string) (latestState memState, ts time.Time) {
+	lock.RLock()
+	defer lock.RUnlock()
+	var inMem bool
+	var mem *memory
+	if mem, inMem = urlMap[url]; inMem {
+		latestState = mem.latestState
+		if latestState == Redirected {
+			ts = mem.redirectedAt
+		} else if latestState == Cancelled {
+			ts = mem.cancelledAt
 		}
-	} ()
+	} else {
+		latestState = None
+	}
+	return
+}
 
+func getLastRedirected (url string) (latestState memState, ts time.Time) {
+	lock.RLock()
+	defer lock.RUnlock()
+	var inMem bool
+	var mem *memory
+	if mem, inMem = urlMap[url]; inMem {
+		latestState = mem.latestState
+		ts = mem.redirectedAt
+	} else {
+		latestState = None
+	}
+	return
+}
+
+func getLastCancelled (url string) (latestState memState, ts time.Time) {
+	lock.RLock()
+	defer lock.RUnlock()
+	var inMem bool
+	var mem *memory
+	if mem, inMem = urlMap[url]; inMem {
+		latestState = mem.latestState
+		ts = mem.cancelledAt
+	} else {
+		latestState = None
+	}
+	return
+}
+
+func getLastPended (url string) (latestState memState, ts time.Time) {
+	lock.RLock()
+	defer lock.RUnlock()
+	var inMem bool
+	var mem *memory
+	if mem, inMem = urlMap[url]; inMem {
+		latestState = mem.latestState
+		ts = mem.pendedAt
+	} else {
+		latestState = None
+	}
+	return
+}
+
+func memorizePended (url string) (err error) {
 	lock.Lock()
 	defer lock.Unlock()
-	if m, exists := redirectedMap[url]; exists {
-		redirectedMap[url] =  memory{ index: m.index, markedAt: time.Now() } // This happens for unmarke item bursted and mem that is older then 24hr
-		return
-	}
 
-	if len(redirectedUrls[memPointer]) > 0 {
-		delete(redirectedMap, redirectedUrls[memPointer])
+	if m, exists := urlMap[url]; exists {
+		m.pendedAt = time.Now() // This happens for unmarke item bursted and mem that is older then 24hr
+		m.latestState = Pended
+		return
+	} else {
+		if len(urls[memPointer]) > 0 {
+			delete(urlMap, urls[memPointer])
+		}
+		urls[memPointer] = url
+		urlMap[url] = &memory{ index: memPointer, pendedAt: time.Now(), latestState: Pended }
+		memPointer++
+		if memPointer >= MEM_SIZE {
+			memPointer = 0
+		}
 	}
-	redirectedUrls[memPointer] = url
-	redirectedMap[url] = memory{ index: memPointer, markedAt: time.Now() }
-	memPointer++
-	if memPointer >= MEM_SIZE {
-		memPointer = 0
+	return
+}
+
+func memorizeShared (url string) (err error) {
+	lock.Lock()
+	defer lock.Unlock()
+
+	if m, exists := urlMap[url]; exists {
+		m.sharedAt = time.Now() // This happens for unmarke item bursted and mem that is older then 24hr
+		m.latestState = Shared
+		return
+	} else {
+		if len(urls[memPointer]) > 0 {
+			delete(urlMap, urls[memPointer])
+		}
+		urls[memPointer] = url
+		urlMap[url] = &memory{ index: memPointer, sharedAt: time.Now(), latestState: Shared }
+		memPointer++
+		if memPointer >= MEM_SIZE {
+			memPointer = 0
+		}
+	}
+	return
+}
+
+
+func memorizeResult (url string, state memState) (err error) {
+	lock.Lock()
+	defer lock.Unlock()
+
+	if m, exists := urlMap[url]; exists {
+		if state == Redirected {
+			m.redirectedAt = time.Now()
+		} else if state == Cancelled {
+			m.cancelledAt = time.Now()
+		}
+		m.latestState = state
+		return
+	} else {
+		if len(urls[memPointer]) > 0 {
+			delete(urlMap, urls[memPointer])
+		}
+		urls[memPointer] = url
+		if state == Redirected {
+			urlMap[url] = &memory{ index: memPointer, redirectedAt: time.Now(), latestState: state }
+		} else if state == Cancelled {
+			urlMap[url] = &memory{ index: memPointer, cancelledAt: time.Now(), latestState: state }
+		}
+		memPointer++
+		if memPointer >= MEM_SIZE {
+			memPointer = 0
+		}
 	}
 	return
 }
@@ -68,10 +209,25 @@ func markRedirected(url string) (err error) {
 func forget (url string) {
 	lock.Lock()
 	defer lock.Unlock()
-	if mem, exists := redirectedMap[url]; exists {
+	if mem, exists := urlMap[url]; exists {
 		return
 	} else {
-		redirectedUrls[mem.index] = ""
-		delete(redirectedMap, url)		
+		urls[mem.index] = ""
+		delete(urlMap, url)		
+	}
+}
+
+func memStateToString (ms memState) string {
+	switch ms {
+	case Shared:
+		return "Shared"
+	case Pended:
+		return "Pended"
+	case Redirected:
+		return "Redirected"
+	case Cancelled:
+		return "Cancelled"
+	default:
+		return "???"
 	}
 }

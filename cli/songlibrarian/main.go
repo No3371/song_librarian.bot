@@ -265,6 +265,7 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 					if err != nil {
 						logger.Logger.Errorf("Failed to validate: %v", err)
 					}
+					memorizeResult(originalMsg.Embeds[p.embedIndex].URL, CancelledWithError)
 					return
 				}
 			}
@@ -276,6 +277,7 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 				if err != nil {
 					logger.Logger.Errorf("Failed to validate: %v", err)
 				}
+				memorizeResult(originalMsg.Embeds[p.embedIndex].URL, CancelledWithError)
 				return
 			}
 	
@@ -294,6 +296,19 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 					// Failed to remove the bot message...?
 					logger.Logger.Errorf("Failed to remove the bot message: %v", err)
 				}
+				memorizeResult(originalMsg.Embeds[p.embedIndex].URL, Cancelled)
+				return
+			}
+	
+			destCId, bound := binding.QueryBinding(p.bindingId).DestChannelId(finalType)
+			if !bound {
+				logger.Logger.Infof("[MAIN] No destination bound to %v", finalType)
+				err = s.DeleteMessage(botMsg.ChannelID, botMsg.ID, "Temporary bot message")
+				if err != nil {
+					// Failed to remove the bot message...?
+					logger.Logger.Errorf("Failed to remove the bot message: %d", err)
+				}
+				memorizeResult(originalMsg.Embeds[p.embedIndex].URL, CancelledWithError)
 				return
 			}
 
@@ -337,22 +352,12 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 				}
 			}
 			
-	
-			destCId, bound := binding.QueryBinding(p.bindingId).DestChannelId(finalType)
-			if !bound {
-				logger.Logger.Infof("[MAIN] No destination bound to %v", finalType)
-				err = s.DeleteMessage(botMsg.ChannelID, botMsg.ID, "Temporary bot message")
-				if err != nil {
-					// Failed to remove the bot message...?
-					logger.Logger.Errorf("Failed to remove the bot message: %d", err)
-				}
-				return
-			}
-			
 			var data *api.SendMessageData
 			data, err = prepareRedirectionMessage(originalMsg, p, result)
 			if err != nil {
 				logger.Logger.Errorf("Failed to prepare redirection message!\n%v", err)
+				memorizeResult(originalMsg.Embeds[p.embedIndex].URL, CancelledWithError)
+				return
 			}
 	
 			var rm *discord.Message
@@ -376,7 +381,7 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 				}
 			}
 
-			markRedirected(originalMsg.Embeds[p.embedIndex].URL)
+			memorizeResult(originalMsg.Embeds[p.embedIndex].URL, Redirected)
 
 			logger.Logger.Infof("  Redirected     c%d - m%d", destCId, rm.ID)	
 			atomic.AddUint64(&statSession.Redirected, 1)
@@ -517,7 +522,7 @@ func decideType (pending *pendingEmbed, botMsg *discord.Message) (rType redirect
 	communityVotes = c_o + c_c + c_s + c_n
 	if communityVotes == 0  {
 		if pending.isDup { // Skip duplicates
-			logger.Logger.Infof("  [%s] DUPLICATE", pending.taskId)
+			logger.Logger.Infof("  [%s-%d] DUPLICATE", pending.taskId, pending.embedIndex)
 			atomic.AddUint64(&statSession.SkippedDuplicate, 1)
 			return redirect.None, 0, nil
 		}
@@ -568,7 +573,7 @@ func decideType (pending *pendingEmbed, botMsg *discord.Message) (rType redirect
 		if pending.autoType == redirect.None {
 			logger.Logger.Infof("  [%s-%d] CANCEL   | o%d c%d s%d n%d ✔️", pending.taskId, pending.embedIndex, c_o, c_c, c_s, c_n)
 		} else {
-			logger.Logger.Infof("  [%s-%d]CANCEL   | o%d c%d s%d n%d ❓", pending.taskId, pending.embedIndex, c_o, c_c, c_s, c_n)
+			logger.Logger.Infof("  [%s-%d] CANCEL   | o%d c%d s%d n%d ❓", pending.taskId, pending.embedIndex, c_o, c_c, c_s, c_n)
 		}
 		return redirect.None, communityVotes, nil
 	}
