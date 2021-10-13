@@ -131,6 +131,7 @@ func onMessageCreated (s *state.State, task *mHandleSession) (err error) {
 				}
 			}
 			
+			atomic.AddUint64(&statSession.BoundChannelMessage, 1)
 			if len(task.msg.Embeds) > 0 {
 				atomic.AddUint64(&statSession.FetchedAndAnalyzed, 1)
 			}
