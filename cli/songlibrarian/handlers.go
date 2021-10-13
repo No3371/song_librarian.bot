@@ -475,7 +475,13 @@ func guess (task *mHandleSession, eIndex int) (redirectType redirect.RedirectTyp
 	var countNotC = 0
 	var countS = 0
 	var countNotS = 0
+	var countBadForAll = 0
 
+	countBadForAll, err = countMatch(sb, "BadForAll", regexBadForAll, embed.Title)
+	if err != nil {
+		logger.Logger.Errorf("Failed to match for BadForAll keywords: %v", err)
+		return redirect.Unknown, err
+	}
 
 	countC, err = countMatch(sb, "Cover", regexCover_s0, embed.Title)
 	if err != nil {
@@ -526,10 +532,19 @@ func guess (task *mHandleSession, eIndex int) (redirectType redirect.RedirectTyp
 		return redirect.Unknown, nil
 	}
 
-	countC -= countNotC
-	countO -= countNotO
-	countS -= countNotS
-
+	countC -= (countNotC + countBadForAll)
+	countO -= (countNotO + countBadForAll)
+	countS -= (countNotS + countBadForAll)
+	if countC < 0 {
+		countC = 0
+	}
+	if countO < 0 {
+		countO = 0
+	}
+	if countS < 0 {
+		countS = 0
+	}
+	
 	if countC > countO && countC > countS {
 		return redirect.Cover, nil
 	}
