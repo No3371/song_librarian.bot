@@ -550,7 +550,7 @@ func guess (task *mHandleSession, eIndex int) (redirectType redirect.RedirectTyp
 		return redirect.Cover, nil
 	}
 
-	if countO > countC && countO > countS {
+	if countO > countC && countO > countS || (countO >= countC && countO > countS) {
 		if countC > 0 && countO < 3 { // If there's a keywork of Cover, it's very unlikely it'd be Original
 			return redirect.Cover, nil
 		}
