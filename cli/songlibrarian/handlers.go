@@ -49,8 +49,15 @@ func addEventHandlers (s *state.State) (err error){
 		if e.Author.Bot {
 			return
 		}
-
 		atomic.AddUint64(&statSession.MessageEvents, 1)
+		
+		if sub, iErr := getSubState(e.Author.ID); iErr != nil {
+			logger.Logger.Errorf("Error when getSubState(): %v", iErr)
+		} else if !sub {
+			atomic.AddUint64(&statSession.UnSubbedSkips, 1)
+			return;
+		}
+
 
 		buffer<-&mHandleSession{
 			rId: getRandomID(3),
@@ -78,7 +85,7 @@ func handlerLoop (s *state.State) {
 			atomic.AddUint64(&statSession.FirstFetchEmbeds0, 1)
 		}
 
-		if time.Now().Sub(item.msg.Timestamp.Time().Local()) < time.Second*2 {
+		if time.Since(item.msg.Timestamp.Time().Local()) < time.Second*2 {
 			<-fetchDelayTimer.C
 			fetchDelayTimer.Reset(time.Second * 3)
 			item.msg, err = s.Message(item.cId, item.mId)

@@ -38,6 +38,8 @@ var C_DESC string
 var C_ORIGINAL_DESC string
 var C_COVER_DESC string
 var C_DELETE_ID_DESC string
+var C_DESC_UNSUB string
+var C_DESC_RESUB string
 
 var ORIGINAL string
 var COVER    string
@@ -119,6 +121,8 @@ func SetLanguage (lang Locale) {
 		C_DESC = "channel"
 		C_COVER_DESC = "翻唱歌曲頻道 ID"
 		C_ORIGINAL_DESC = "原創歌曲頻道 ID"
+		C_DESC_UNSUB = "忽略我的分享"
+		C_DESC_RESUB = "重新開始轉發我的分享"
 		ORIGINAL = "🇴 原創"
 		COVER = "🇨 翻唱"
 		STREAM = "🇸 歌回"

@@ -315,6 +315,7 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 			if communityVotes == 0 { // No one voted
 				if p.preType == redirect.Unknown { // It's NOT pre-typed
 					if finalType == p.autoType {
+						atomic.AddUint64(&statSession.GuessRight, 1)
 						result = RESULT_BOT_GUESS
 					} else {
 						panic("WHO CHANGED MY ANSWER!?")
@@ -325,6 +326,7 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 					}
 
 					if p.autoType == finalType { // Bot guessed it right
+						atomic.AddUint64(&statSession.GuessRight, 1)
 						result = RESULT_SHARER_AND_BOT
 					} else {
 						result = RESULT_SHARER
@@ -335,14 +337,17 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 					if p.autoType == redirect.Unknown {
 						result = RESULT_COMMUNITY
 					} else if finalType == p.autoType {
+						atomic.AddUint64(&statSession.GuessRight, 1)
 						result = RESULT_BOT_GUESS_AGREED
 					} else {
 						result = RESULT_BOT_GUESS_FIXED
 					}
 				} else {
 					if p.autoType == finalType && p.preType == finalType {
+						atomic.AddUint64(&statSession.GuessRight, 1)
 						result = RESULT_SHARER_AND_BOT_AND_COMMUNITY
 					} else if p.autoType == finalType {
+						atomic.AddUint64(&statSession.GuessRight, 1)
 						result = RESULT_SHARER_AND_BOT
 					} else if p.preType == finalType {
 						result = RESULT_SHARER_AND_COMMUNITY

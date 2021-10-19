@@ -12,6 +12,8 @@ type CommandDefinition int
 
 const (
 	DeleteRedirectedMessage CommandDefinition = iota
+	Unsubscribe
+	Resubscribe
 )
 
 var commandIdMap map[discord.CommandID]CommandDefinition
@@ -93,6 +95,65 @@ func assureCommands (s *state.State) (err error) {
 	// 	if err != nil {
 	// 		logger.Logger.Errorf("Command creation error: %v", err)
 	// 	}
+
+	if cmd, exist := required[commandNameUnsub]; !exist {
+		logger.Logger.Infof("[LOG] Creating command: %s", commandNameUnsub)
+		cmdR, err := s.CreateCommand(_appid, api.CreateCommandData{
+			Type: discord.ChatInputCommand,
+			Name:        commandNameUnsub,
+			Description: locale.C_DESC_UNSUB,
+			NoDefaultPermission: false,
+		})
+
+		if err != nil {
+			logger.Logger.Errorf("Command creation error: %v", err)
+		} else {
+			logger.Logger.Infof("DELETE command created: %d", cmdR.ID)
+			sv.SaveCommandId(int(Unsubscribe), uint64(cmdR.ID), 0)
+			commandIdMap[cmdR.ID] = Unsubscribe
+		}
+	} else {
+		var savedCmdId uint64
+		var savedCmdVersion uint32
+		savedCmdId, savedCmdVersion, err = sv.LoadCommandId(int(Unsubscribe))
+		if savedCmdId != uint64(cmd.ID) {
+			logger.Logger.Errorf("Command ID Mismatch! Overriding with online ID!")
+			sv.SaveCommandId(int(Unsubscribe), uint64(cmd.ID), savedCmdVersion)
+			commandIdMap[discord.CommandID(savedCmdId)] = Unsubscribe
+		} else {
+			commandIdMap[discord.CommandID(savedCmdId)] = Unsubscribe
+		}
+	}
+
+	
+	if cmd, exist := required[commandNameResub]; !exist {
+		logger.Logger.Infof("[LOG] Creating command: %s", commandNameResub)
+		cmdR, err := s.CreateCommand(_appid, api.CreateCommandData{
+			Type: discord.ChatInputCommand,
+			Name:        commandNameResub,
+			Description: locale.C_DESC_RESUB,
+			NoDefaultPermission: false,
+		})
+
+		if err != nil {
+			logger.Logger.Errorf("Command creation error: %v", err)
+		} else {
+			logger.Logger.Infof("DELETE command created: %d", cmdR.ID)
+			sv.SaveCommandId(int(Resubscribe), uint64(cmdR.ID), 0)
+			commandIdMap[cmdR.ID] = Resubscribe
+		}
+	} else {
+		var savedCmdId uint64
+		var savedCmdVersion uint32
+		savedCmdId, savedCmdVersion, err = sv.LoadCommandId(int(Resubscribe))
+		if savedCmdId != uint64(cmd.ID) {
+			logger.Logger.Errorf("Command ID Mismatch! Overriding with online ID!")
+			sv.SaveCommandId(int(Resubscribe), uint64(cmd.ID), savedCmdVersion)
+			commandIdMap[discord.CommandID(savedCmdId)] = Resubscribe
+		} else {
+			commandIdMap[discord.CommandID(savedCmdId)] = Resubscribe
+		}
+	}
 
 	if cmd, exist := required[commandNameDelete]; !exist {
 		logger.Logger.Infof("[LOG] Creating command: %s", commandNameDelete)

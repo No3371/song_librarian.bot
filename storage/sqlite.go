@@ -530,6 +530,142 @@ func (s *sqlite) LoadCommandId(defId int) (cmdId uint64, version uint32, err err
 	return cmdId, version, nil
 }
 
+func (s *sqlite) SaveSubState (uId uint64, state bool) (err error) {
+	var stateNum int
+	if state {
+		stateNum = 1
+	} else {
+		stateNum = 0
+	}
+	var tx *sql.Tx
+	tx, err = s.BeginTx(context.Background(), &sql.TxOptions{
+		Isolation: 0,
+		ReadOnly:  false,
+	})
+	defer func () {
+		if err != nil {
+			tx.Rollback()
+			logger.Logger.Errorf("[DB] Rollback: %s", err)
+		} else {
+			err = tx.Commit()
+			if err != nil {
+				tx.Rollback()
+				logger.Logger.Errorf("[DB] Rollback: %s", err)
+			}
+		}
+	} ()
+	if err != nil {
+		return err
+	}
+
+	query := fmt.Sprintf(
+	`
+	SELECT SUB
+	FROM USERS
+	WHERE U_ID = %d;
+	`, uId)
+
+	var rows *sql.Rows
+	rows, err = s.Query(query)
+	if err != nil {
+		return err
+	}
+	
+	var exists = true
+	if !rows.Next() {
+		// Need to create
+		exists = false
+	}
+	err = rows.Err()
+	if err != nil {
+		return err
+	}
+	rows.Close()
+
+
+	if exists {
+		stmt := fmt.Sprintf(
+		`
+		UPDATE Users
+		SET U_ID = %d, SUB = %d
+		WHERE CD = %d;
+		`, uId, stateNum)
+		
+		_, err = tx.Exec(stmt)
+		if err != nil {
+			return err
+		}
+	} else {
+		stmt := fmt.Sprintf(
+		`
+		INSERT INTO Users (U_ID, SUB)
+		VALUES (%d, %d);
+		`, uId, stateNum)
+		
+		_, err = tx.Exec(stmt)
+		if err != nil {
+			return err
+		}
+
+	}
+
+	return nil
+}
+
+func (s *sqlite) LoadSubState (uId uint64) (state bool, err error) {
+	var tx *sql.Tx
+	tx, err = s.BeginTx(context.Background(), &sql.TxOptions{
+		Isolation: 0,
+		ReadOnly:  true,
+	})
+	defer func () {
+		if err != nil {
+			tx.Rollback()
+			logger.Logger.Errorf("[DB] Rollback: %s", err)
+		} else {
+			err = tx.Commit()
+			if err != nil {
+				tx.Rollback()
+				logger.Logger.Errorf("[DB] Rollback: %s", err)
+			}
+		}
+	} ()
+	query := fmt.Sprintf(
+	`
+	SELECT SUB
+	FROM Users
+	WHERE U_ID = %d;
+	`, uId)
+
+	var rows *sql.Rows
+	rows, err = tx.Query(query)
+	if err != nil {
+		return false, err
+	}
+
+	var v int32 = -1
+	
+	for rows.Next() {
+		err = rows.Scan(&v)
+		if err != nil {
+			return false, err
+		}
+	}
+	err = rows.Err()
+	if err != nil {
+			return false, err
+	}
+	rows.Close()
+	if v == 0 {
+		return false, nil
+	} else if v == 1 {
+		return true, nil
+	} else if v == -1 { // Not saved
+		return true, nil // Defaukt to true
+	} else {
+		return false, errors.New("unexpected sub state stored")
+	}
+}
 
 type sqlite struct {
 	*sql.DB
@@ -625,6 +761,19 @@ func Sqlite () (sv *sqlite, err error) {
 		ALTER TABLE Commands
 		ADD V int
 		`)
+	}
+
+	
+	err = sv.tx(`
+	CREATE TABLE IF NOT EXISTS Users (
+		U_ID int,
+		SUB bool
+	)
+	`)
+	if err != nil {
+		logger.Logger.Fatalf("[Storage] Failed to create table \"Users\": %s", err)
+	} else {
+		logger.Logger.Infof("[Storage] Created table \"Users\".")
 	}
 
 	

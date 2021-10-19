@@ -89,6 +89,38 @@ func addInteractionHandlers(s *state.State) {
 					logger.Logger.Errorf("  Failed to respond: %v", err)
 					return
 				}
+			case Unsubscribe:
+				err = unsub(e.User.ID)
+				if err != nil {
+					logger.Logger.Errorf("  Failed to unsub: %v", err)
+					return
+				}
+				err = s.RespondInteraction(e.ID, e.Token, api.InteractionResponse{
+					Type: api.MessageInteractionWithSource,
+					Data: &api.InteractionResponseData{
+						Content: option.NewNullableString("Unsubscribed!"),
+					},
+				})
+				if err != nil {
+					logger.Logger.Errorf("  Failed to respond: %v", err)
+					return
+				}
+			case Resubscribe:
+				err = resub(e.User.ID)
+				if err != nil {
+					logger.Logger.Errorf("  Failed to resub: %v", err)
+					return
+				}
+				err = s.RespondInteraction(e.ID, e.Token, api.InteractionResponse{
+					Type: api.MessageInteractionWithSource,
+					Data: &api.InteractionResponseData{
+						Content: option.NewNullableString("Resubscribed!"),
+					},
+				})
+				if err != nil {
+					logger.Logger.Errorf("  Failed to respond: %v", err)
+					return
+				}
 				break
 			}
 			break
