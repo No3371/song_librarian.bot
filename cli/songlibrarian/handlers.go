@@ -51,11 +51,20 @@ func addEventHandlers (s *state.State) (err error){
 		}
 		atomic.AddUint64(&statSession.MessageEvents, 1)
 		
-		if sub, iErr := getSubState(e.Author.ID); iErr != nil {
-			logger.Logger.Errorf("Error when getSubState(): %v", iErr)
-		} else if !sub {
-			atomic.AddUint64(&statSession.UnSubbedSkips, 1)
-			return;
+		var mentioned bool
+		
+		for _, m := range e.Mentions {
+			if m.ID == meIDCahce {
+				mentioned = true
+			}
+		}
+		if !mentioned {
+			if sub, iErr := getSubState(e.Author.ID); iErr != nil {
+				logger.Logger.Errorf("Error when getSubState(): %v", iErr)
+			} else if !sub {
+				atomic.AddUint64(&statSession.UnSubbedSkips, 1)
+				return;
+			}
 		}
 
 
