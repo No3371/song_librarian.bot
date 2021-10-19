@@ -90,6 +90,7 @@ func addInteractionHandlers(s *state.State) {
 					return
 				}
 			case Unsubscribe:
+				logger.Logger.Infof("  UNSUB: " + e.User.Username)
 				err = unsub(e.User.ID)
 				if err != nil {
 					logger.Logger.Errorf("  Failed to unsub: %v", err)
@@ -106,6 +107,7 @@ func addInteractionHandlers(s *state.State) {
 					return
 				}
 			case Resubscribe:
+				logger.Logger.Infof("  RESUB: " + e.User.Username)
 				err = resub(e.User.ID)
 				if err != nil {
 					logger.Logger.Errorf("  Failed to resub: %v", err)
