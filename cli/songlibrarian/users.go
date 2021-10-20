@@ -6,6 +6,10 @@ import (
 
 var subscribingStates map[discord.UserID]bool
 
+func init () {
+	subscribingStates = make(map[discord.UserID]bool)
+}
+
 func unsub (u discord.UserID) (err error) {
 	subscribingStates[u] = false
 	return sv.SaveSubState(uint64(u), false)

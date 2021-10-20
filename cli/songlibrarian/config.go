@@ -10,6 +10,4 @@ const (
 	commandNameDelete = "dm"
 	commandNameUnsub = "fuckoff"
 	commandNameResub = "comeback"
-
-	needVoteDelayMultiplier = 2
 )

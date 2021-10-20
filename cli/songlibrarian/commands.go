@@ -116,11 +116,14 @@ func assureCommands (s *state.State) (err error) {
 		var savedCmdId uint64
 		var savedCmdVersion uint32
 		savedCmdId, savedCmdVersion, err = sv.LoadCommandId(int(Unsubscribe))
-		if savedCmdId != uint64(cmd.ID) {
+		if err != nil {
+			logger.Logger.Errorf("Command Unsubscribe loading error: %v", err)
+		} else if savedCmdId != uint64(cmd.ID) {
 			logger.Logger.Errorf("Command ID Mismatch! Overriding with online ID!")
 			sv.SaveCommandId(int(Unsubscribe), uint64(cmd.ID), savedCmdVersion)
 			commandIdMap[discord.CommandID(savedCmdId)] = Unsubscribe
 		} else {
+			logger.Logger.Infof("Unsubscribe command laoded: %d", savedCmdId)
 			commandIdMap[discord.CommandID(savedCmdId)] = Unsubscribe
 		}
 	}
@@ -146,11 +149,14 @@ func assureCommands (s *state.State) (err error) {
 		var savedCmdId uint64
 		var savedCmdVersion uint32
 		savedCmdId, savedCmdVersion, err = sv.LoadCommandId(int(Resubscribe))
-		if savedCmdId != uint64(cmd.ID) {
+		if err != nil {
+			logger.Logger.Errorf("Command Resubscribe loading error: %v", err)
+		} else if savedCmdId != uint64(cmd.ID) {
 			logger.Logger.Errorf("Command ID Mismatch! Overriding with online ID!")
 			sv.SaveCommandId(int(Resubscribe), uint64(cmd.ID), savedCmdVersion)
 			commandIdMap[discord.CommandID(savedCmdId)] = Resubscribe
 		} else {
+			logger.Logger.Infof("Resubscribe command laoded: %d", savedCmdId)
 			commandIdMap[discord.CommandID(savedCmdId)] = Resubscribe
 		}
 	}
@@ -213,11 +219,14 @@ func assureCommands (s *state.State) (err error) {
 		var savedCmdId uint64
 		var savedCmdVersion uint32
 		savedCmdId, savedCmdVersion, err = sv.LoadCommandId(int(DeleteRedirectedMessage))
-		if savedCmdId != uint64(cmd.ID) {
+		if err != nil {
+			logger.Logger.Errorf("Command DeleteRedirectedMessage loading error: %v", err)
+		} else if savedCmdId != uint64(cmd.ID) {
 			logger.Logger.Errorf("Command ID Mismatch! Overriding with online ID!")
 			sv.SaveCommandId(int(DeleteRedirectedMessage), uint64(cmd.ID), savedCmdVersion)
 			commandIdMap[discord.CommandID(savedCmdId)] = DeleteRedirectedMessage
 		} else {
+			logger.Logger.Infof("DeleteRedirectedMessage command laoded: %d", savedCmdId)
 			commandIdMap[discord.CommandID(savedCmdId)] = DeleteRedirectedMessage
 		}
 	}

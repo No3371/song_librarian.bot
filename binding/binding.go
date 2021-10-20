@@ -14,13 +14,9 @@ var changedBindings map[int]struct{}
 var changedMappings map[uint64]struct{}
 var sp storage.StorageProvider
 
-func init () {
-	var err error
-	sp, err = storage.Sqlite()
-	if err != nil {
-		logger.Logger.Fatalf("%s", err)
-	}
 
+func Setup (s storage.StorageProvider) {
+	sp = s
 	allBindings = make(map[int]*ChannelBinding)
 	mapping= make(map[uint64]map[int]struct{})
 	changedBindings = make(map[int]struct{})

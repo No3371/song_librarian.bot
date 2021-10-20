@@ -131,11 +131,14 @@ func session (sCloser chan struct{}) (err error) {
 		return errors.Wrap(err, "Failed to get storage")
 	}
 
+	binding.Setup(sv)
+
 	s, err := state.New("Bot " + *globalFlags.token)
 	if err != nil {
 		return errors.Wrap(err, "Failed to get new bot state")
 	}
 
+	s.AddIntents(gateway.IntentDirectMessages)
 	s.AddIntents(gateway.IntentGuildMessages)
 	s.AddIntents(gateway.IntentGuildMessageReactions)
 
@@ -143,10 +146,10 @@ func session (sCloser chan struct{}) (err error) {
 
 	redirectorClosed := redirectorLoop(s, sessionSelfCloser)
 
-	// err = assureCommands(s)
-	// if err != nil {
-	// 	logger.Logger.Fatalf("[MAIN] %v", err)
-	// }
+	err = assureCommands(s)
+	if err != nil {
+		logger.Logger.Fatalf("[MAIN] %v", err)
+	}
 
 	addEventHandlers(s)
 	addInteractionHandlers(s)
@@ -290,6 +293,14 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 				logger.Logger.Errorf("Failed to decide type: %v", err)
 			}
 
+			if p.autoType != finalType {
+				noteGuessedWrong(badGuessRecord {
+					title: originalMsg.Embeds[p.embedIndex].Title,
+					guess: p.autoType,
+					result: finalType,
+				})
+			}
+
 			if finalType == redirect.None {
 				err = s.DeleteMessage(botMsg.ChannelID, botMsg.ID, "Temporary bot message")
 				if err != nil {
@@ -356,6 +367,7 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 					}
 				}
 			}
+
 			
 			var data *api.SendMessageData
 			data, err = prepareRedirectionMessage(originalMsg, p, result)

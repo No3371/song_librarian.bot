@@ -122,6 +122,9 @@ func handle (input string, s *state.State) (err error) {
 	case "stats":
 		statSession.Print()
 		break
+	case "badguesses":
+		printBadGuesses()
+		break
 	default:
 		return errors.New("Unexpected command")
 	}

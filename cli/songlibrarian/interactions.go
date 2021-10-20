@@ -35,11 +35,11 @@ func addInteractionHandlers(s *state.State) {
 			var data = e.Data.(*discord.CommandInteractionData)
 			switch commandIdMap[data.ID] {
 			case DeleteRedirectedMessage:
+				logger.Logger.Infof("  DELETE")
 				if len(data.Options) < 2 {
 					logger.Logger.Infof("Need atleast 2 options provided")
 					return
 				}
-				logger.Logger.Infof("  DELETE")
 				var cId uint64
 				cId, err = strconv.ParseUint(data.Options[0].String(), 10, 64)
 				if err != nil {

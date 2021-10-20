@@ -496,7 +496,7 @@ func (s *sqlite) LoadCommandId(defId int) (cmdId uint64, version uint32, err err
 	}
 
 	var j string
-	var v uint32
+	var v uint64
 	
 	for rows.Next() {
 		err = rows.Scan(&j, &v)
@@ -520,7 +520,7 @@ func (s *sqlite) LoadCommandId(defId int) (cmdId uint64, version uint32, err err
 	}
 	
 	var _version uint64
-	_version, err = strconv.ParseUint(j, 10, 32)
+	_version, err = strconv.ParseUint(j, 10, 64)
 	if err != nil {
 			return 0, 0, err
 	}
@@ -587,9 +587,9 @@ func (s *sqlite) SaveSubState (uId uint64, state bool) (err error) {
 		stmt := fmt.Sprintf(
 		`
 		UPDATE Users
-		SET U_ID = %d, SUB = %d
-		WHERE CD = %d;
-		`, uId, stateNum)
+		SET SUB = %d
+		WHERE U_ID = %d;
+		`, stateNum, uId)
 		
 		_, err = tx.Exec(stmt)
 		if err != nil {
