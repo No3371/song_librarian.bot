@@ -33,7 +33,7 @@ type mHandleSession struct {
 	setTypes []redirect.RedirectType
 }
 
-var meMentionCache string
+var meIdString string
 var meIDCahce discord.UserID
 
 func addEventHandlers (s *state.State) (err error){
@@ -43,7 +43,7 @@ func addEventHandlers (s *state.State) (err error){
 	}
 
 	meIDCahce = me.ID
-	meMentionCache = fmt.Sprintf("<@!%d>", meIDCahce)
+	meIdString = fmt.Sprintf("%d", meIDCahce)
 
 	s.AddHandler(func (e *gateway.MessageCreateEvent) {
 		if e.Author.Bot {
@@ -157,8 +157,17 @@ func onMessageCreated (s *state.State, task *mHandleSession) (err error) {
 					scanner := bufio.NewScanner(strings.NewReader(task.msg.Content))
 					for scanner.Scan() {
 						line := scanner.Text()
-						if strings.HasPrefix(line, meMentionCache) {
-							for _, flag := range strings.Fields(line) {
+						var mentionMatch *regexp2.Match
+						mentionMatch, err = regexMention.FindStringMatch(line)
+						if err != nil || mentionMatch == nil {
+							continue
+						}
+						if mentionMatch.GroupCount() < 2 {
+							continue
+						}
+						mg := mentionMatch.Groups()[1].String()
+						if mg == meIdString {
+							for _, flag := range strings.Fields(line)[1:] {
 								switch flag {
 								case "o":
 									task.setTypes = append(task.setTypes, redirect.Original)

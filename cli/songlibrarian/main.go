@@ -198,6 +198,7 @@ func session (sCloser chan struct{}) (err error) {
 	if err != nil {
 		log.Fatalln("Failed to get myself:", err)
 	}
+	logger.Logger.Infof("Session: %d", u.ID)
 	
 	s.UpdateStatus(gateway.UpdateStatusData{
 		Since:      0,

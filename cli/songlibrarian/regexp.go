@@ -28,3 +28,5 @@ var regexBadForAll = regexp2.MustCompile(`trailer`, regexp2.IgnoreCase)
 
 var regexNamedCover = regexp2.MustCompile(`ver.EMA`, regexp2.IgnoreCase)
 var regexNamedStream = regexp2.MustCompile(`【YouTube Live】波羅ノ鬼 - Harano oni`, regexp2.IgnoreCase)
+
+var regexMention = regexp2.MustCompile(`^<@!(\d+)>`, regexp2.IgnoreCase)
