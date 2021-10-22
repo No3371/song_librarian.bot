@@ -123,7 +123,7 @@ func assureCommands (s *state.State) (err error) {
 			sv.SaveCommandId(int(Unsubscribe), uint64(cmd.ID), savedCmdVersion)
 			commandIdMap[discord.CommandID(savedCmdId)] = Unsubscribe
 		} else {
-			logger.Logger.Infof("Unsubscribe command laoded: %d", savedCmdId)
+			logger.Logger.Infof("Unsubscribe command loaded: %d", savedCmdId)
 			commandIdMap[discord.CommandID(savedCmdId)] = Unsubscribe
 		}
 	}
@@ -156,7 +156,7 @@ func assureCommands (s *state.State) (err error) {
 			sv.SaveCommandId(int(Resubscribe), uint64(cmd.ID), savedCmdVersion)
 			commandIdMap[discord.CommandID(savedCmdId)] = Resubscribe
 		} else {
-			logger.Logger.Infof("Resubscribe command laoded: %d", savedCmdId)
+			logger.Logger.Infof("Resubscribe command loaded: %d", savedCmdId)
 			commandIdMap[discord.CommandID(savedCmdId)] = Resubscribe
 		}
 	}
@@ -226,7 +226,7 @@ func assureCommands (s *state.State) (err error) {
 			sv.SaveCommandId(int(DeleteRedirectedMessage), uint64(cmd.ID), savedCmdVersion)
 			commandIdMap[discord.CommandID(savedCmdId)] = DeleteRedirectedMessage
 		} else {
-			logger.Logger.Infof("DeleteRedirectedMessage command laoded: %d", savedCmdId)
+			logger.Logger.Infof("DeleteRedirectedMessage command loaded: %d", savedCmdId)
 			commandIdMap[discord.CommandID(savedCmdId)] = DeleteRedirectedMessage
 		}
 	}
