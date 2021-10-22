@@ -52,7 +52,7 @@ func (s *sqlite) SaveChannelMapping(cId uint64, bIDs map[int]struct{}) (err erro
 	if err != nil {
 		return err
 	}
-	
+
 	var exists = true
 	if !rows.Next() {
 		// Need to create
@@ -72,7 +72,7 @@ func (s *sqlite) SaveChannelMapping(cId uint64, bIDs map[int]struct{}) (err erro
 		SET C_ID = %d, B_IDs = '%s'
 		WHERE C_ID = %d;
 		`, cId, j, cId)
-		
+
 		_, err = tx.Exec(stmt)
 		if err != nil {
 			return err
@@ -83,7 +83,7 @@ func (s *sqlite) SaveChannelMapping(cId uint64, bIDs map[int]struct{}) (err erro
 		INSERT INTO Mappings (C_ID, B_IDs)
 		VALUES (%d, '%s');
 		`, cId, string(j))
-		
+
 		_, err = tx.Exec(stmt)
 		if err != nil {
 			return err
@@ -135,7 +135,7 @@ func (s *sqlite) SaveBinding(bId int, b interface {}) (err error) {
 	if err != nil {
 		return err
 	}
-	
+
 	var exists = true
 	if !rows.Next() {
 		// Need to create
@@ -154,7 +154,7 @@ func (s *sqlite) SaveBinding(bId int, b interface {}) (err error) {
 		SET Json = '%s'
 		WHERE B_ID = %d;
 		`, string(j), bId)
-		
+
 		var r sql.Result
 		r, err = tx.Exec(stmt)
 		if err != nil {
@@ -173,7 +173,7 @@ func (s *sqlite) SaveBinding(bId int, b interface {}) (err error) {
 		INSERT INTO Bindings (B_ID, Json)
 		VALUES (%d, '%s');
 		`, bId, string(j))
-		
+
 		var r sql.Result
 		r, err = tx.Exec(stmt)
 		if err != nil {
@@ -224,7 +224,7 @@ func (s *sqlite) LoadChannelMapping (cId uint64) (bIDs map[int]struct{}, err err
 	}
 
 	var j string
-	
+
 	for rows.Next() {
 		err = rows.Scan(&j)
 		if err != nil {
@@ -236,7 +236,7 @@ func (s *sqlite) LoadChannelMapping (cId uint64) (bIDs map[int]struct{}, err err
 		return nil, err
 	}
 	rows.Close()
-	
+
 	err = json.Unmarshal([]byte(j), &bIDs)
 
 	return bIDs, nil
@@ -273,7 +273,7 @@ func (s *sqlite) LoadBinding (bId int, b interface{}) (err error) {
 	if err != nil {
 		return err
 	}
-	
+
 	var j string
 	for rows.Next() {
 		err = rows.Scan(&j)
@@ -324,13 +324,13 @@ func (s *sqlite) RemoveBinding(bId int) (err error) {
 	DELETE FROM Bindings
 	WHERE B_ID = %d;
 	`, bId)
-	
+
 	_, err = tx.Exec(stmt)
 	if err != nil {
 		return err
 	}
 
-	return nil	
+	return nil
 }
 
 func (s *sqlite) SaveAll() (err error) {
@@ -360,7 +360,7 @@ func (s *sqlite) GetBindingCount () (count int, err error) {
 		}
 	} ()
 
-	query := 
+	query :=
 	`
 	SELECT COUNT(*)
 	FROM Bindings;
@@ -371,7 +371,7 @@ func (s *sqlite) GetBindingCount () (count int, err error) {
 	if err != nil {
 		return 0, err
 	}
-	
+
 	for rows.Next() {
 		err = rows.Scan(&count)
 		if err != nil {
@@ -422,7 +422,7 @@ func (s *sqlite) SaveCommandId(defId int, cmdId uint64, version uint32) (err err
 	if err != nil {
 		return err
 	}
-	
+
 	var exists = true
 	if !rows.Next() {
 		// Need to create
@@ -442,7 +442,7 @@ func (s *sqlite) SaveCommandId(defId int, cmdId uint64, version uint32) (err err
 		SET CD = %d, CMD_ID = '%s', V = %d
 		WHERE CD = %d;
 		`, defId, strconv.FormatUint(cmdId, 10), version, defId)
-		
+
 		_, err = tx.Exec(stmt)
 		if err != nil {
 			return err
@@ -453,7 +453,7 @@ func (s *sqlite) SaveCommandId(defId int, cmdId uint64, version uint32) (err err
 		INSERT INTO Commands (CD, CMD_ID, V)
 		VALUES (%d, '%s', %d);
 		`, defId, strconv.FormatUint(cmdId, 10), version)
-		
+
 		_, err = tx.Exec(stmt)
 		if err != nil {
 			return err
@@ -497,7 +497,7 @@ func (s *sqlite) LoadCommandId(defId int) (cmdId uint64, version uint32, err err
 
 	var j string
 	var v uint64
-	
+
 	for rows.Next() {
 		err = rows.Scan(&j, &v)
 		if err != nil {
@@ -518,7 +518,7 @@ func (s *sqlite) LoadCommandId(defId int) (cmdId uint64, version uint32, err err
 	if err != nil {
 			return 0, 0, err
 	}
-	
+
 	var _version uint64
 	_version, err = strconv.ParseUint(j, 10, 64)
 	if err != nil {
@@ -526,7 +526,7 @@ func (s *sqlite) LoadCommandId(defId int) (cmdId uint64, version uint32, err err
 	}
 
 	version = uint32(_version)
-	
+
 	return cmdId, version, nil
 }
 
@@ -570,7 +570,7 @@ func (s *sqlite) SaveSubState (uId uint64, state bool) (err error) {
 	if err != nil {
 		return err
 	}
-	
+
 	var exists = true
 	if !rows.Next() {
 		// Need to create
@@ -590,7 +590,7 @@ func (s *sqlite) SaveSubState (uId uint64, state bool) (err error) {
 		SET SUB = %d
 		WHERE U_ID = %d;
 		`, stateNum, uId)
-		
+
 		_, err = tx.Exec(stmt)
 		if err != nil {
 			return err
@@ -601,7 +601,7 @@ func (s *sqlite) SaveSubState (uId uint64, state bool) (err error) {
 		INSERT INTO Users (U_ID, SUB)
 		VALUES (%d, %d);
 		`, uId, stateNum)
-		
+
 		_, err = tx.Exec(stmt)
 		if err != nil {
 			return err
@@ -644,7 +644,7 @@ func (s *sqlite) LoadSubState (uId uint64) (state bool, err error) {
 	}
 
 	var v int32 = -1
-	
+
 	for rows.Next() {
 		err = rows.Scan(&v)
 		if err != nil {
@@ -715,55 +715,44 @@ func Sqlite () (sv *sqlite, err error) {
 		s,
 	}
 
-	if !tableMappingsFound {
-		err = sv.tx(`
-		CREATE TABLE Mappings (
-			C_ID string,
-			B_IDs string
-		)
-		`)
-		if err != nil {
-			logger.Logger.Fatalf("[Storage] Failed to create table \"Mappings\": %s", err)
-		} else {
-			logger.Logger.Infof("[Storage] Created table \"Mappings\".")
-		}
-	}
-	
-	if !tableBindingsFound {
-		err = sv.tx(`
-		CREATE TABLE Bindings (
-			B_ID int,
-			Json string
-		)
-		`)
-		if err != nil {
-			logger.Logger.Fatalf("[Storage] Failed to create table \"Bindings\": %s", err)
-		} else {
-			logger.Logger.Infof("[Storage] Created table \"Bindings\".")
-		}
-	}
-
-	if !tableCommandsFound {
-		err = sv.tx(`
-		CREATE TABLE Commands (
-			CD int,
-			CMD_ID string,
-			V int
-		)
-		`)
-		if err != nil {
-			logger.Logger.Fatalf("[Storage] Failed to create table \"Commands\": %s", err)
-		} else {
-			logger.Logger.Infof("[Storage] Created table \"Commands\".")
-		}
+	err = sv.tx(`
+	CREATE TABLE Mappings (
+		C_ID string,
+		B_IDs string
+	)
+	`)
+	if err != nil {
+		logger.Logger.Fatalf("[Storage] Failed to create table \"Mappings\": %s", err)
 	} else {
-		sv.tx(`
-		ALTER TABLE Commands
-		ADD V int
-		`)
+		logger.Logger.Infof("[Storage] Ensured table \"Mappings\".")
 	}
 
-	
+	err = sv.tx(`
+	CREATE TABLE Bindings (
+		B_ID int,
+		Json string
+	)
+	`)
+	if err != nil {
+		logger.Logger.Fatalf("[Storage] Failed to create table \"Bindings\": %s", err)
+	} else {
+		logger.Logger.Infof("[Storage] Ensured table \"Bindings\".")
+	}
+
+	err = sv.tx(`
+	CREATE TABLE Commands (
+		CD int,
+		CMD_ID string,
+		V int
+	)
+	`)
+	if err != nil {
+		logger.Logger.Fatalf("[Storage] Failed to create table \"Commands\": %s", err)
+	} else {
+		logger.Logger.Infof("[Storage] Ensured table \"Commands\".")
+	}
+
+
 	err = sv.tx(`
 	CREATE TABLE IF NOT EXISTS Users (
 		U_ID int,
@@ -773,10 +762,10 @@ func Sqlite () (sv *sqlite, err error) {
 	if err != nil {
 		logger.Logger.Fatalf("[Storage] Failed to create table \"Users\": %s", err)
 	} else {
-		logger.Logger.Infof("[Storage] Created table \"Users\".")
+		logger.Logger.Infof("[Storage] Ensured table \"Users\".")
 	}
 
-	
+
 
 	return sv, err
 }
