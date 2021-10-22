@@ -714,7 +714,7 @@ func Sqlite () (sv *sqlite, err error) {
 	}
 
 	err = sv.tx(`
-	CREATE TABLE Mappings (
+	CREATE TABLE IF NOT EXISTS Mappings (
 		C_ID string,
 		B_IDs string
 	)
@@ -726,7 +726,7 @@ func Sqlite () (sv *sqlite, err error) {
 	}
 
 	err = sv.tx(`
-	CREATE TABLE Bindings (
+	CREATE TABLE IF NOT EXISTS Bindings (
 		B_ID int,
 		Json string
 	)
@@ -738,7 +738,7 @@ func Sqlite () (sv *sqlite, err error) {
 	}
 
 	err = sv.tx(`
-	CREATE TABLE Commands (
+	CREATE TABLE IF NOT EXISTS Commands (
 		CD int,
 		CMD_ID string,
 		V int
