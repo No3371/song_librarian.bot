@@ -303,6 +303,9 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 			}
 
 			if finalType == redirect.None {
+				if p.autoType == redirect.None {
+					atomic.AddUint64(&statSession.GuessRight, 1)
+				}
 				err = s.DeleteMessage(botMsg.ChannelID, botMsg.ID, "Temporary bot message")
 				if err != nil {
 					// Failed to remove the bot message...?

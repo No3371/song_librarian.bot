@@ -343,6 +343,7 @@ func pendEmbed (s *state.State, task *mHandleSession, eIndex int, bId int) (err 
 				break
 			case redirect.Clip:
 				sendMessageData.Content = fmt.Sprintf(locale.DETECTED_CLIPS_DUPLICATE, embed.Title, passed, delay.Seconds())
+				autoType = redirect.None
 			}
 
 		} else {
@@ -368,7 +369,7 @@ func pendEmbed (s *state.State, task *mHandleSession, eIndex int, bId int) (err 
 				}
 				break
 			case redirect.Unknown:
-					sendMessageData.Content = fmt.Sprintf(locale.DETECTED_UNKNOWN, embed.Title, delay.Seconds())
+				sendMessageData.Content = fmt.Sprintf(locale.DETECTED_UNKNOWN, embed.Title, delay.Seconds())
 				break
 			case redirect.Clip:
 				if lastMem == Cancelled {
