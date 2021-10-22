@@ -678,38 +678,36 @@ func Sqlite () (sv *sqlite, err error) {
 		return nil, err
 	}
 
-	var tableCommandsFound, tableMappingsFound, tableBindingsFound bool
+	// var r *sql.Rows
+	// r, err = s.Query(`
+	// SELECT name FROM sqlite_master WHERE type='table';
+	// `)
+	// if err != nil {
+	// 	logger.Logger.Fatalf("%s", err)
+	// }
 
-	var r *sql.Rows
-	r, err = s.Query(`
-	SELECT name FROM sqlite_master WHERE type='table';
-	`)
-	if err != nil {
-		logger.Logger.Fatalf("%s", err)
-	}
-
-	var tName string
-	func () {
-		defer r.Close()
-		for r.Next() {
-			err = r.Scan(&tName)
-			if err != nil {
-				logger.Logger.Fatalf("%s", err)
-			}
-			// logger.Logger.Infof("[Storage] %s", tName)
-			switch tName {
-			case "Mappings":
-				tableMappingsFound = true
-				break
-			case "Bindings":
-				tableBindingsFound = true
-				break
-			case "Commands":
-				tableCommandsFound = true
-				break
-			}
-		}
-	} ()
+	// var tName string
+	// func () {
+	// 	defer r.Close()
+	// 	for r.Next() {
+	// 		err = r.Scan(&tName)
+	// 		if err != nil {
+	// 			logger.Logger.Fatalf("%s", err)
+	// 		}
+	// 		// logger.Logger.Infof("[Storage] %s", tName)
+	// 		switch tName {
+	// 		case "Mappings":
+	// 			tableMappingsFound = true
+	// 			break
+	// 		case "Bindings":
+	// 			tableBindingsFound = true
+	// 			break
+	// 		case "Commands":
+	// 			tableCommandsFound = true
+	// 			break
+	// 		}
+	// 	}
+	// } ()
 
 	sv = &sqlite{
 		s,
