@@ -498,11 +498,15 @@ func guess (task *mHandleSession, eIndex int) (redirectType redirect.RedirectTyp
 
 	var countO = 0
 	var countNotO = 0
+	var countDNotO = 0
 	var countC = 0
+	var countDC = 0
 	var countNotC = 0
 	var countS = 0
 	var countNotS = 0
 	var countBadForAll = 0
+
+	// ! NOTE: Discord does not provide full description
 
 	countBadForAll, err = countMatch(sb, "BadForAll", regexBadForAll, embed.Title)
 	if err != nil {
@@ -514,6 +518,15 @@ func guess (task *mHandleSession, eIndex int) (redirectType redirect.RedirectTyp
 	if err != nil {
 		logger.Logger.Errorf("Failed to match for Cover keywords: %v", err)
 		return redirect.Unknown, err
+	}
+
+	countDC, err = countMatch(sb, "D.Cover", regexCoverDesc, embed.Description)
+	if err != nil {
+		logger.Logger.Errorf("Failed to match for D.Cover keywords: %v", err)
+		return redirect.Unknown, err
+	}
+	if countDC >= 2 {
+		countDC /= 2
 	}
 
 	countNotC, err = countMatch(sb, "NotCover", regexBadForCover, embed.Title)
@@ -534,6 +547,15 @@ func guess (task *mHandleSession, eIndex int) (redirectType redirect.RedirectTyp
 		return redirect.Unknown, err
 	}
 
+	countDNotO, err = countMatch(sb, "D.NotOriginal", regexBadDescForOriginal, embed.Description)
+	if err != nil {
+		logger.Logger.Errorf("Failed to match for D.NotOriginal keywords: %v", err)
+		return redirect.Unknown, err
+	}
+	if countDNotO >= 2 {
+		countDNotO /= 2
+	}
+
 	countS, err = countMatch(sb,"Stream", regexStream_s2, embed.Title)
 	if err != nil {
 		logger.Logger.Errorf("Failed to match for Stream keywords: %v", err)
@@ -547,11 +569,11 @@ func guess (task *mHandleSession, eIndex int) (redirectType redirect.RedirectTyp
 	}
 
 	if countC + countO + countS == 0 {
-		logger.Logger.Infof("  [GUESS-%s-%d] o%d c%d s%d(-%d)", task.rId, eIndex, countO, countC, countS, countNotS)
+		logger.Logger.Infof("  [GUESS-%s-%d] o%d(-%d-%d) c%d(+%d-%d) s%d(-%d)", task.rId, eIndex, countO, countNotO, countDNotO, countC, countDC, countNotC, countS, countNotS)
 		return redirect.None, nil
 	} else {
 		logger.Logger.Infof("  [GUESS-%s-%d] %s", task.rId, eIndex, sb.String())
-		logger.Logger.Infof("  [GUESS-%s-%d] o%d(-%d) c%d(-%d) s%d(-%d)", task.rId, eIndex, countO, countNotO, countC, countNotC, countS, countNotS)
+		logger.Logger.Infof("  [GUESS-%s-%d] o%d(-%d-%d) c%d(+%d-%d) s%d(-%d)", task.rId, eIndex, countO, countNotO, countDNotO, countC, countDC, countNotC, countS, countNotS)
 	}
 
 
@@ -560,7 +582,8 @@ func guess (task *mHandleSession, eIndex int) (redirectType redirect.RedirectTyp
 	}
 
 	countC -= (countNotC + countBadForAll)
-	countO -= (countNotO + countBadForAll)
+	countC += countDC
+	countO -= (countNotO + countBadForAll + countDNotO)
 	countS -= (countNotS + countBadForAll)
 	if countC < 0 {
 		countC = 0
