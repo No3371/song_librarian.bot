@@ -269,7 +269,9 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 					if err != nil {
 						logger.Logger.Errorf("Failed to validate: %v", err)
 					}
-					memorizeResult(originalMsg.Embeds[p.embedIndex].URL, CancelledWithError)
+					if originalMsg != nil {
+						memorizeResult(originalMsg.Embeds[p.embedIndex].URL, CancelledWithError)
+					}
 					return
 				}
 			}
@@ -281,7 +283,9 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 				if err != nil {
 					logger.Logger.Errorf("Failed to validate: %v", err)
 				}
-				memorizeResult(originalMsg.Embeds[p.embedIndex].URL, CancelledWithError)
+				if originalMsg != nil {
+					memorizeResult(originalMsg.Embeds[p.embedIndex].URL, CancelledWithError)
+				}
 				return
 			}
 	
@@ -323,7 +327,9 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 					// Failed to remove the bot message...?
 					logger.Logger.Errorf("Failed to remove the bot message: %d", err)
 				}
-				memorizeResult(originalMsg.Embeds[p.embedIndex].URL, CancelledWithError)
+				if originalMsg != nil {
+					memorizeResult(originalMsg.Embeds[p.embedIndex].URL, CancelledWithError)
+				}
 				return
 			}
 
@@ -377,7 +383,9 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 			data, err = prepareRedirectionMessage(originalMsg, p, result)
 			if err != nil {
 				logger.Logger.Errorf("Failed to prepare redirection message!\n%v", err)
-				memorizeResult(originalMsg.Embeds[p.embedIndex].URL, CancelledWithError)
+				if originalMsg != nil {
+					memorizeResult(originalMsg.Embeds[p.embedIndex].URL, CancelledWithError)
+				}
 				return
 			}
 	
