@@ -20,7 +20,7 @@ var regexBadForCover = regexp2.MustCompile(`live`, regexp2.IgnoreCase | regexp2.
 var regexBadForStream = regexp2.MustCompile(`debut|birthday stream|食べ`, regexp2.IgnoreCase | regexp2.Multiline)
 var regexBadForAll = regexp2.MustCompile(`trailer`, regexp2.IgnoreCase | regexp2.Multiline)
 
-var regexCoverDesc = regexp2.MustCompile(`cover`, regexp2.IgnoreCase | regexp2.Multiline)
+var regexCoverDesc = regexp2.MustCompile(`(本家|original)(.+?\n?)http.+?$`, regexp2.IgnoreCase | regexp2.Multiline)
 
 var regexBadDescForOriginal = regexp2.MustCompile(`(本家|original)(.+?\n?)http.+?$|from original`, regexp2.IgnoreCase | regexp2.Multiline)
 
