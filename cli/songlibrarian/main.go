@@ -41,6 +41,7 @@ type pendingEmbed struct {
 	estimatedRTime time.Time
 	autoType, preType redirect.RedirectType
 	isDup bool
+	spoiler bool
 }
 
 type resultType int
@@ -318,7 +319,7 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 				memorizeResult(originalMsg.Embeds[p.embedIndex].URL, Cancelled)
 				return
 			}
-	
+
 			if p.autoType != finalType { // finalType is not None
 				atomic.AddUint64(&statSession.GueseWrongType, 1)
 			}
@@ -553,6 +554,7 @@ func decideType (pending *pendingEmbed, botMsg *discord.Message) (rType redirect
 	}
 
 	communityVotes = c_o + c_c + c_s + c_n
+
 	if communityVotes == 0  {
 		if pending.isDup { // Skip duplicates
 			logger.Logger.Infof("  [%s-%d] DUPLICATE", pending.taskId, pending.embedIndex)
@@ -602,6 +604,7 @@ func decideType (pending *pendingEmbed, botMsg *discord.Message) (rType redirect
 	}
 
 	sum := c_o + c_c + c_s
+
 	if sum == 0 || (c_n > c_o - 1 && c_n > c_c - 1 && c_n > c_s - 1) {
 		if pending.autoType == redirect.None {
 			logger.Logger.Infof("  [%s-%d] CANCEL   | o%d c%d s%d n%d ✔️", pending.taskId, pending.embedIndex, c_o, c_c, c_s, c_n)
