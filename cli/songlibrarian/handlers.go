@@ -156,7 +156,7 @@ func onMessageCreated (s *state.State, task *mHandleSession) (err error) {
 			scanner := bufio.NewScanner(strings.NewReader(task.msg.Content))
 			for scanner.Scan() {
 				line := scanner.Text()
-				if strings.Contains(line, "/spoiler") || strings.Count(line, "||") %2 == 0 {
+				if strings.Contains(line, "/spoiler") || strings.Count(line, "||") > 1 {
 					task.spolierLines = append(task.spolierLines, line)
 				}
 
