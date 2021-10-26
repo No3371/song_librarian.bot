@@ -18,7 +18,7 @@ const (
 	CancelledWithError
 )
 
-const MEM_SIZE = 256
+const MEM_SIZE = 512
 
 var urlMap map[string]*memory
 var urls [MEM_SIZE]string

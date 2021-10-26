@@ -235,7 +235,7 @@ func pendEmbed (s *state.State, task *mHandleSession, eIndex int, bId int) (err 
 	logger.Logger.Infof("  [%s] Memory: %s (%s) | %d", task.rId, memStateToString(lastMem), lastResultTime.Sub(time.Now()), memPointer)
 	
 	var redirectedRecently bool = false
-	if (lastMem == Redirected || lastMem == Cancelled) && time.Now().Sub(lastRedirectTime) < time.Hour * 24 {
+	if (lastMem == Redirected || lastMem == Cancelled) && time.Now().Sub(lastRedirectTime) < *globalFlags.cooldown {
 		redirectedRecently = true
 	}
 
