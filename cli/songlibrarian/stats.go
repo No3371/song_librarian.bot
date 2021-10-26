@@ -26,6 +26,7 @@ type stats struct {
 	Pended              uint64
 	Redirected          uint64
 	GuessRight          uint64
+	GueseWrongType      uint64
 }
 
 var statSession *stats

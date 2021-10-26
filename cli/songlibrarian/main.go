@@ -319,6 +319,10 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 				return
 			}
 	
+			if p.autoType != finalType { // finalType is not None
+				atomic.AddUint64(&statSession.GueseWrongType, 1)
+			}
+	
 			destCId, bound := binding.QueryBinding(p.bindingId).DestChannelId(finalType)
 			if !bound {
 				logger.Logger.Infof("[MAIN] No destination bound to %v", finalType)
