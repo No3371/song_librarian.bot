@@ -15,6 +15,8 @@ const (
 
 var HELLO string
 var DETECTED string
+var DETECTED_SPOILER string
+var DETECTED_SPOILER_DUPLICATE string
 var DETECTED_MATCH_NONE string
 var DETECTED_MATCH_NONE_AND_SHARED string
 var DETECTED_MATCH_NONE_AND_CANCELLED string
@@ -102,10 +104,12 @@ func SetLanguage (lang Locale) {
 		BUTTON_ORIGINAL = "原創"
 		BUTTON_COVER = "翻唱"
 		DETECTED =                                 "▶️ **%s**\n**(๑•̀ㅂ•́)و✧** 猜測為 *%s*，%.0f 秒後自動轉發。可對此訊息投票修改分類：🇴 原創 / 🇨 翻唱 / 🇸 歌回 / ❌ 不轉發"
+		DETECTED_SPOILER =                         "▶️ ||**%s**||\n** ( ͡° ͜ʖ ͡°)** 這一坨是啥？預設 ❌*不轉發*。%.0f 秒內可對此訊息投票修改分類：🇴 原創 / 🇨 翻唱 / 🇸 歌回 / ❌ 不轉發"
+		DETECTED_SPOILER_DUPLICATE =               "▶️ ||**%s**||\n** ( ͡° ͜ʖ ͡°)** 這一坨是啥？預設 ❌*不轉發*，但 **%s 前轉發過**...%.0f 秒內可對此訊息投票修改分類：🇴 原創 / 🇨 翻唱 / 🇸 歌回 / ❌ 不轉發"
 		DETECTED_CLIPS =                           "▶️ **%s**\n**/ᐠ｡ꞈ｡ᐟ\\\\** 疑似剪輯，預設 ❌*不轉發*。%.0f 秒內可對此訊息投票修改分類：🇴 原創 / 🇨 翻唱 / 🇸 歌回 / ❌ 不轉發"
 		DETECTED_MATCH_NONE =                      "▶️ **%s**\n**( ˘•ω•˘ )** 標題不含關鍵字，預設 ❌*不轉發*。%.0f 秒內可對此訊息投票修改分類：🇴 原創 / 🇨 翻唱 / 🇸 歌回 / ❌ 不轉發"
 		DETECTED_MATCH_NONE_AND_SHARED =           "▶️ **%s**\n**( ˘•ω•˘ )** 標題不含關鍵字，預設 ❌*不轉發*（ %s 前已被分享過）。%.0f 秒內可對此訊息投票修改分類：🇴 原創 / 🇨 翻唱 / 🇸 歌回 / ❌ 不轉發"
-		DETECTED_MATCH_NONE_AND_CANCELLED =           "▶️ **%s**\n**( ˘•ω•˘ )** 標題不含關鍵字，預設 ❌*不轉發*（ %s 前曾經不轉發）。%.0f 秒內可對此訊息投票修改分類：🇴 原創 / 🇨 翻唱 / 🇸 歌回 / ❌ 不轉發"
+		DETECTED_MATCH_NONE_AND_CANCELLED =        "▶️ **%s**\n**( ˘•ω•˘ )** 標題不含關鍵字，預設 ❌*不轉發*（ %s 前曾經不轉發）。%.0f 秒內可對此訊息投票修改分類：🇴 原創 / 🇨 翻唱 / 🇸 歌回 / ❌ 不轉發"
 		DETECTED_UNKNOWN =                         "▶️ **%s**\n**(ﾟ∀。)** 瓦卡拉奈，預設 ❌*不轉發*。多拉 A 夢幫幫我！%.0f 秒內可對此訊息投票決定分類：🇴 原創 / 🇨 翻唱 / 🇸 歌回 / ❌ 不轉發"
 		DETECTED_PRE_TYPED =                       "▶️ **%s**\n**(\\*゜ω゜)ゞ** 分享者建議為 *%s*，%.0f 秒後自動執行。可對此訊息投票修改分類：🇴 原創 / 🇨 翻唱 / 🇸 歌回 / ❌ 不轉發"
 		DETECTED_PRE_TYPED_AGREED =                "▶️ **%s**\n**(\\*゜ω゜)ゞ** 分享者建議為 *%s*（我也這麼認為！）%.0f 秒後自動執行。可對此訊息投票修改分類：🇴 原創 / 🇨 翻唱 / 🇸 歌回 / ❌ 不轉發"

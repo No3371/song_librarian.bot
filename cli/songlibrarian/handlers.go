@@ -31,6 +31,7 @@ type mHandleSession struct {
 	mId discord.MessageID
 	msg *discord.Message
 	setTypes []redirect.RedirectType
+	spolierLines []string
 }
 
 var meIdString string
@@ -152,40 +153,40 @@ func onMessageCreated (s *state.State, task *mHandleSession) (err error) {
 				atomic.AddUint64(&statSession.FetchedAndAnalyzed, 1)
 			}
 
-			for _, mentioned := range task.msg.Mentions {
-				if mentioned.ID == meIDCahce {
-					scanner := bufio.NewScanner(strings.NewReader(task.msg.Content))
-					for scanner.Scan() {
-						line := scanner.Text()
-						var mentionMatch *regexp2.Match
-						mentionMatch, err = regexMention.FindStringMatch(line)
-						if err != nil || mentionMatch == nil {
-							continue
-						}
-						if mentionMatch.GroupCount() < 2 {
-							continue
-						}
-						mg := mentionMatch.Groups()[1].String()
-						if mg == meIdString {
-							for _, flag := range strings.Fields(line)[1:] {
-								switch flag {
-								case "o":
-									task.setTypes = append(task.setTypes, redirect.Original)
-									break
-								case "c":
-									task.setTypes = append(task.setTypes, redirect.Cover)
-									break
-								case "s":
-									task.setTypes = append(task.setTypes, redirect.Stream)
-									break
-								case "x":
-									task.setTypes = append(task.setTypes, redirect.None)
-									break
-								default:
-									task.setTypes = append(task.setTypes, redirect.Unknown)
-									break
-								}
-							}
+			scanner := bufio.NewScanner(strings.NewReader(task.msg.Content))
+			for scanner.Scan() {
+				line := scanner.Text()
+				if strings.Contains(line, "/spoiler") || strings.Count(line, "||") %2 == 0 {
+					task.spolierLines = append(task.spolierLines, line)
+				}
+
+				var mentionMatch *regexp2.Match
+				mentionMatch, err = regexMention.FindStringMatch(line)
+				if err != nil || mentionMatch == nil {
+					continue
+				}
+				if mentionMatch.GroupCount() < 2 {
+					continue
+				}
+				idMentioned := mentionMatch.Groups()[1].String()
+				if idMentioned == meIdString {
+					for _, flag := range strings.Fields(line)[1:] {
+						switch flag {
+						case "o":
+							task.setTypes = append(task.setTypes, redirect.Original)
+							break
+						case "c":
+							task.setTypes = append(task.setTypes, redirect.Cover)
+							break
+						case "s":
+							task.setTypes = append(task.setTypes, redirect.Stream)
+							break
+						case "x":
+							task.setTypes = append(task.setTypes, redirect.None)
+							break
+						default:
+							task.setTypes = append(task.setTypes, redirect.Unknown)
+							break
 						}
 					}
 				}
@@ -237,7 +238,6 @@ func pendEmbed (s *state.State, task *mHandleSession, eIndex int, bId int) (err 
 	if (lastMem == Redirected || lastMem == Cancelled) && time.Now().Sub(lastRedirectTime) < time.Hour * 24 {
 		redirectedRecently = true
 	}
-	
 
 	autoType, err = guess(task, eIndex)
 	if err != nil {
@@ -252,7 +252,19 @@ func pendEmbed (s *state.State, task *mHandleSession, eIndex int, bId int) (err 
 		preType = task.setTypes[eIndex]
 	}
 
-	if preType != redirect.Unknown { // If not UNKNOWN, accept the preype
+	var hasSpoilerTag bool = len(task.spolierLines) > 0 // ! Embed links are resolved by Discord, the link may be different from the original shared one
+
+	if hasSpoilerTag {
+		logger.Logger.Infof("  Spoiler tag detected." )
+		delay = delay * 4 / 10
+		passed := time.Now().Sub(lastResultTime).Round(time.Second)
+		if redirectedRecently {
+			sendMessageData.Content = fmt.Sprintf(locale.DETECTED_SPOILER_DUPLICATE, embed.Title, passed, delay.Seconds())
+		} else {
+			sendMessageData.Content = fmt.Sprintf(locale.DETECTED_SPOILER, embed.Title, delay.Seconds())
+		}
+		autoType = redirect.None
+	} else if preType != redirect.Unknown { // If not UNKNOWN, accept the preype
 		var typeLocale string
 
 		if redirectedRecently {
@@ -446,6 +458,11 @@ func pendEmbed (s *state.State, task *mHandleSession, eIndex int, bId int) (err 
 		autoType: autoType,
 		preType: preType,
 		isDup: redirectedRecently,
+		spoiler: hasSpoilerTag,
+	}
+
+	if hasSpoilerTag {
+		atomic.AddUint64(&statSession.PendedSpoilerFlag, 1)
 	}
 
 	if err = memorizePended(embed.URL); err != nil {

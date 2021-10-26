@@ -22,6 +22,7 @@ type stats struct {
 	AnalyzedEmbeds      uint64
 	UrlRegexMatched     uint64
 	SkippedDuplicate    uint64
+	PendedSpoilerFlag		uint64
 	Pended              uint64
 	Redirected          uint64
 	GuessRight          uint64
