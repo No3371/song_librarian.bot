@@ -17,6 +17,19 @@ type StorageProvider interface {
 	SaveSubState(uId uint64, state bool) (err error)
 	LoadSubState(uId uint64) (state bool, err error)
 
+	// SaveMem save a single record into the database
+	SaveMem(tId int, id int, data string) (err error)
+	LoadMems (tId int, from int, to int, deserializer func (slot int, data string) error) (err error)
+	GetLatestMemIndex (tId int) (int, error)
+	// LoadMem get a single record from the database
+	// LoadMem(tId uint64, id int) (data string, err error)
+
+	// // SaveMemTrack save the whole serialized track into the database
+	// SaveMemTrack (id int, trackJson string) (err error)
+	// // LoadMemTrack get the whole serialized track from the database
+	// // By utilise this, we can avoid reading all rows on startup
+	// LoadMemTrack (id int) (trackJson string, err error)
+
 	SaveAll() (err error)
 	Close() (err error)
 }

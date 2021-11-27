@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"time"
 
 	"No3371.github.com/song_librarian.bot/logger"
 	_ "github.com/mattn/go-sqlite3"
@@ -18,18 +19,20 @@ func (s *sqlite) SaveChannelMapping(cId uint64, bIDs map[int]struct{}) (err erro
 		Isolation: 0,
 		ReadOnly:  false,
 	})
-	defer func () {
+	defer func() {
 		if err != nil {
-			tx.Rollback()
-			logger.Logger.Errorf("[DB] Rollback: %s", err)
+			logger.Logger.Errorf("[DB] Error found before tx commit: %v", err)
+			err = tx.Rollback()
+			if err != nil {
+				logger.Logger.Errorf("[DB] Rollback error: %s", err)
+			}
 		} else {
 			err = tx.Commit()
 			if err != nil {
-				tx.Rollback()
-				logger.Logger.Errorf("[DB] Rollback: %s", err)
+				logger.Logger.Errorf("[DB] Tx commit error: %s", err)
 			}
 		}
-	} ()
+	}()
 	if err != nil {
 		return err
 	}
@@ -41,7 +44,7 @@ func (s *sqlite) SaveChannelMapping(cId uint64, bIDs map[int]struct{}) (err erro
 	}
 
 	query := fmt.Sprintf(
-	`
+		`
 	SELECT C_ID
 	FROM Mappings
 	WHERE C_ID = %d;
@@ -64,10 +67,9 @@ func (s *sqlite) SaveChannelMapping(cId uint64, bIDs map[int]struct{}) (err erro
 	}
 	rows.Close()
 
-
 	if exists {
 		stmt := fmt.Sprintf(
-		`
+			`
 		UPDATE Mappings
 		SET C_ID = %d, B_IDs = '%s'
 		WHERE C_ID = %d;
@@ -79,7 +81,7 @@ func (s *sqlite) SaveChannelMapping(cId uint64, bIDs map[int]struct{}) (err erro
 		}
 	} else {
 		stmt := fmt.Sprintf(
-		`
+			`
 		INSERT INTO Mappings (C_ID, B_IDs)
 		VALUES (%d, '%s');
 		`, cId, string(j))
@@ -94,7 +96,7 @@ func (s *sqlite) SaveChannelMapping(cId uint64, bIDs map[int]struct{}) (err erro
 	return nil
 }
 
-func (s *sqlite) SaveBinding(bId int, b interface {}) (err error) {
+func (s *sqlite) SaveBinding(bId int, b interface{}) (err error) {
 	var tx *sql.Tx
 	tx, err = s.BeginTx(context.Background(), &sql.TxOptions{
 		Isolation: 0,
@@ -103,28 +105,30 @@ func (s *sqlite) SaveBinding(bId int, b interface {}) (err error) {
 	if err != nil {
 		return err
 	}
-	defer func () {
+	defer func() {
 		if err != nil {
-			tx.Rollback()
-			logger.Logger.Errorf("[DB] Rollback: %s", err)
+			logger.Logger.Errorf("[DB] Error found before tx commit: %v", err)
+			err = tx.Rollback()
+			if err != nil {
+				logger.Logger.Errorf("[DB] Rollback error: %s", err)
+			}
 		} else {
 			err = tx.Commit()
 			if err != nil {
-				tx.Rollback()
-				logger.Logger.Errorf("[DB] Rollback: %s", err)
+				logger.Logger.Errorf("[DB] Tx commit error: %s", err)
 			}
 		}
-	} ()
+	}()
 
 	var j []byte
 	j, err = json.Marshal(b)
 	if err != nil {
 		return err
 	}
-	logger.Logger.Infof("[DB] Saving: %s", j)
+	// logger.Logger.Infof("[DB] Saving: %s", j)
 
 	query := fmt.Sprintf(
-	`
+		`
 	SELECT Json
 	FROM Bindings
 	WHERE B_ID = %d;
@@ -149,7 +153,7 @@ func (s *sqlite) SaveBinding(bId int, b interface {}) (err error) {
 
 	if exists {
 		stmt := fmt.Sprintf(
-		`
+			`
 		UPDATE Bindings
 		SET Json = '%s'
 		WHERE B_ID = %d;
@@ -169,7 +173,7 @@ func (s *sqlite) SaveBinding(bId int, b interface {}) (err error) {
 		logger.Logger.Infof("[DB] %d rows affected.", ra)
 	} else {
 		stmt := fmt.Sprintf(
-		`
+			`
 		INSERT INTO Bindings (B_ID, Json)
 		VALUES (%d, '%s');
 		`, bId, string(j))
@@ -192,26 +196,28 @@ func (s *sqlite) SaveBinding(bId int, b interface {}) (err error) {
 	return nil
 }
 
-func (s *sqlite) LoadChannelMapping (cId uint64) (bIDs map[int]struct{}, err error)  {
+func (s *sqlite) LoadChannelMapping(cId uint64) (bIDs map[int]struct{}, err error) {
 	var tx *sql.Tx
 	tx, err = s.BeginTx(context.Background(), &sql.TxOptions{
 		Isolation: 0,
 		ReadOnly:  true,
 	})
-	defer func () {
+	defer func() {
 		if err != nil {
-			tx.Rollback()
-			logger.Logger.Errorf("[DB] Rollback: %s", err)
+			logger.Logger.Errorf("[DB] Error found before tx commit: %v", err)
+			err = tx.Rollback()
+			if err != nil {
+				logger.Logger.Errorf("[DB] Rollback error: %s", err)
+			}
 		} else {
 			err = tx.Commit()
 			if err != nil {
-				tx.Rollback()
-				logger.Logger.Errorf("[DB] Rollback: %s", err)
+				logger.Logger.Errorf("[DB] Tx commit error: %s", err)
 			}
 		}
-	} ()
+	}()
 	query := fmt.Sprintf(
-	`
+		`
 	SELECT B_IDs
 	FROM Mappings
 	WHERE C_ID = %d;
@@ -242,27 +248,29 @@ func (s *sqlite) LoadChannelMapping (cId uint64) (bIDs map[int]struct{}, err err
 	return bIDs, nil
 }
 
-func (s *sqlite) LoadBinding (bId int, b interface{}) (err error) {
+func (s *sqlite) LoadBinding(bId int, b interface{}) (err error) {
 	var tx *sql.Tx
 	tx, err = s.BeginTx(context.Background(), &sql.TxOptions{
 		Isolation: 0,
 		ReadOnly:  true,
 	})
-	defer func () {
+	defer func() {
 		if err != nil {
-			tx.Rollback()
-			logger.Logger.Errorf("[DB] Rollback: %s", err)
+			logger.Logger.Errorf("[DB] Error found before tx commit: %v", err)
+			err = tx.Rollback()
+			if err != nil {
+				logger.Logger.Errorf("[DB] Rollback error: %s", err)
+			}
 		} else {
 			err = tx.Commit()
 			if err != nil {
-				tx.Rollback()
-				logger.Logger.Errorf("[DB] Rollback: %s", err)
+				logger.Logger.Errorf("[DB] Tx commit error: %s", err)
 			}
 		}
-	} ()
+	}()
 
 	query := fmt.Sprintf(
-	`
+		`
 	SELECT Json
 	FROM Bindings
 	WHERE B_ID = %d;
@@ -286,7 +294,7 @@ func (s *sqlite) LoadBinding (bId int, b interface{}) (err error) {
 		return err
 	}
 	rows.Close()
-	logger.Logger.Infof("[DB] Loaded: %s", j)
+	// logger.Logger.Infof("[DB] Loaded: %s", j)
 
 	if len(j) == 0 {
 		return errors.New("scanned nothing")
@@ -306,21 +314,23 @@ func (s *sqlite) RemoveBinding(bId int) (err error) {
 		Isolation: 0,
 		ReadOnly:  false,
 	})
-	defer func () {
+	defer func() {
 		if err != nil {
-			tx.Rollback()
-			logger.Logger.Errorf("[DB] Rollback: %s", err)
+			logger.Logger.Errorf("[DB] Error found before tx commit: %v", err)
+			err = tx.Rollback()
+			if err != nil {
+				logger.Logger.Errorf("[DB] Rollback error: %s", err)
+			}
 		} else {
 			err = tx.Commit()
 			if err != nil {
-				tx.Rollback()
-				logger.Logger.Errorf("[DB] Rollback: %s", err)
+				logger.Logger.Errorf("[DB] Tx commit error: %s", err)
 			}
 		}
-	} ()
+	}()
 
 	stmt := fmt.Sprintf(
-	`
+		`
 	DELETE FROM Bindings
 	WHERE B_ID = %d;
 	`, bId)
@@ -341,27 +351,29 @@ func (s *sqlite) Close() (err error) {
 	return s.DB.Close()
 }
 
-func (s *sqlite) GetBindingCount () (count int, err error) {
+func (s *sqlite) GetBindingCount() (count int, err error) {
 	var tx *sql.Tx
 	tx, err = s.BeginTx(context.Background(), &sql.TxOptions{
 		Isolation: 0,
 		ReadOnly:  true,
 	})
-	defer func () {
+	defer func() {
 		if err != nil {
-			tx.Rollback()
-			logger.Logger.Errorf("[DB] Rollback: %s", err)
+			logger.Logger.Errorf("[DB] Error found before tx commit: %v", err)
+			err = tx.Rollback()
+			if err != nil {
+				logger.Logger.Errorf("[DB] Rollback error: %s", err)
+			}
 		} else {
 			err = tx.Commit()
 			if err != nil {
-				tx.Rollback()
-				logger.Logger.Errorf("[DB] Rollback: %s", err)
+				logger.Logger.Errorf("[DB] Tx commit error: %s", err)
 			}
 		}
-	} ()
+	}()
 
 	query :=
-	`
+		`
 	SELECT COUNT(*)
 	FROM Bindings;
 	`
@@ -394,24 +406,26 @@ func (s *sqlite) SaveCommandId(defId int, cmdId uint64, version uint32) (err err
 		Isolation: 0,
 		ReadOnly:  false,
 	})
-	defer func () {
+	defer func() {
 		if err != nil {
-			tx.Rollback()
-			logger.Logger.Errorf("[DB] Rollback: %s", err)
+			logger.Logger.Errorf("[DB] Error found before tx commit: %v", err)
+			err = tx.Rollback()
+			if err != nil {
+				logger.Logger.Errorf("[DB] Rollback error: %s", err)
+			}
 		} else {
 			err = tx.Commit()
 			if err != nil {
-				tx.Rollback()
-				logger.Logger.Errorf("[DB] Rollback: %s", err)
+				logger.Logger.Errorf("[DB] Tx commit error: %s", err)
 			}
 		}
-	} ()
+	}()
 	if err != nil {
 		return err
 	}
 
 	query := fmt.Sprintf(
-	`
+		`
 	SELECT CD
 	FROM Commands
 	WHERE CD = %d;
@@ -434,10 +448,9 @@ func (s *sqlite) SaveCommandId(defId int, cmdId uint64, version uint32) (err err
 	}
 	rows.Close()
 
-
 	if exists {
 		stmt := fmt.Sprintf(
-		`
+			`
 		UPDATE Commands
 		SET CD = %d, CMD_ID = '%s', V = %d
 		WHERE CD = %d;
@@ -449,7 +462,7 @@ func (s *sqlite) SaveCommandId(defId int, cmdId uint64, version uint32) (err err
 		}
 	} else {
 		stmt := fmt.Sprintf(
-		`
+			`
 		INSERT INTO Commands (CD, CMD_ID, V)
 		VALUES (%d, '%s', %d);
 		`, defId, strconv.FormatUint(cmdId, 10), version)
@@ -470,20 +483,22 @@ func (s *sqlite) LoadCommandId(defId int) (cmdId uint64, version uint32, err err
 		Isolation: 0,
 		ReadOnly:  true,
 	})
-	defer func () {
+	defer func() {
 		if err != nil {
-			tx.Rollback()
-			logger.Logger.Errorf("[DB] Rollback: %s", err)
+			logger.Logger.Errorf("[DB] Error found before tx commit: %v", err)
+			err = tx.Rollback()
+			if err != nil {
+				logger.Logger.Errorf("[DB] Rollback error: %s", err)
+			}
 		} else {
 			err = tx.Commit()
 			if err != nil {
-				tx.Rollback()
-				logger.Logger.Errorf("[DB] Rollback: %s", err)
+				logger.Logger.Errorf("[DB] Tx commit error: %s", err)
 			}
 		}
-	} ()
+	}()
 	query := fmt.Sprintf(
-	`
+		`
 	SELECT CMD_ID, V
 	FROM Commands
 	WHERE CD = %d;
@@ -506,23 +521,23 @@ func (s *sqlite) LoadCommandId(defId int) (cmdId uint64, version uint32, err err
 	}
 	err = rows.Err()
 	if err != nil {
-			return 0, 0, err
+		return 0, 0, err
 	}
 	rows.Close()
 
 	if j == "" {
-			return 0, 0, err
+		return 0, 0, err
 	}
 
 	cmdId, err = strconv.ParseUint(j, 10, 64)
 	if err != nil {
-			return 0, 0, err
+		return 0, 0, err
 	}
 
 	var _version uint64
 	_version, err = strconv.ParseUint(j, 10, 64)
 	if err != nil {
-			return 0, 0, err
+		return 0, 0, err
 	}
 
 	version = uint32(_version)
@@ -530,7 +545,7 @@ func (s *sqlite) LoadCommandId(defId int) (cmdId uint64, version uint32, err err
 	return cmdId, version, nil
 }
 
-func (s *sqlite) SaveSubState (uId uint64, state bool) (err error) {
+func (s *sqlite) SaveSubState(uId uint64, state bool) (err error) {
 	var stateNum int
 	if state {
 		stateNum = 1
@@ -542,24 +557,26 @@ func (s *sqlite) SaveSubState (uId uint64, state bool) (err error) {
 		Isolation: 0,
 		ReadOnly:  false,
 	})
-	defer func () {
+	defer func() {
 		if err != nil {
-			tx.Rollback()
-			logger.Logger.Errorf("[DB] Rollback: %s", err)
+			logger.Logger.Errorf("[DB] Error found before tx commit: %v", err)
+			err = tx.Rollback()
+			if err != nil {
+				logger.Logger.Errorf("[DB] Rollback error: %s", err)
+			}
 		} else {
 			err = tx.Commit()
 			if err != nil {
-				tx.Rollback()
-				logger.Logger.Errorf("[DB] Rollback: %s", err)
+				logger.Logger.Errorf("[DB] Tx commit error: %s", err)
 			}
 		}
-	} ()
+	}()
 	if err != nil {
 		return err
 	}
 
 	query := fmt.Sprintf(
-	`
+		`
 	SELECT SUB
 	FROM USERS
 	WHERE U_ID = %d;
@@ -582,10 +599,9 @@ func (s *sqlite) SaveSubState (uId uint64, state bool) (err error) {
 	}
 	rows.Close()
 
-
 	if exists {
 		stmt := fmt.Sprintf(
-		`
+			`
 		UPDATE Users
 		SET SUB = %d
 		WHERE U_ID = %d;
@@ -597,7 +613,7 @@ func (s *sqlite) SaveSubState (uId uint64, state bool) (err error) {
 		}
 	} else {
 		stmt := fmt.Sprintf(
-		`
+			`
 		INSERT INTO Users (U_ID, SUB)
 		VALUES (%d, %d);
 		`, uId, stateNum)
@@ -612,26 +628,28 @@ func (s *sqlite) SaveSubState (uId uint64, state bool) (err error) {
 	return nil
 }
 
-func (s *sqlite) LoadSubState (uId uint64) (state bool, err error) {
+func (s *sqlite) LoadSubState(uId uint64) (state bool, err error) {
 	var tx *sql.Tx
 	tx, err = s.BeginTx(context.Background(), &sql.TxOptions{
 		Isolation: 0,
 		ReadOnly:  true,
 	})
-	defer func () {
+	defer func() {
 		if err != nil {
-			tx.Rollback()
-			logger.Logger.Errorf("[DB] Rollback: %s", err)
+			logger.Logger.Errorf("[DB] Error found before tx commit: %v", err)
+			err = tx.Rollback()
+			if err != nil {
+				logger.Logger.Errorf("[DB] Rollback error: %s", err)
+			}
 		} else {
 			err = tx.Commit()
 			if err != nil {
-				tx.Rollback()
-				logger.Logger.Errorf("[DB] Rollback: %s", err)
+				logger.Logger.Errorf("[DB] Tx commit error: %s", err)
 			}
 		}
-	} ()
+	}()
 	query := fmt.Sprintf(
-	`
+		`
 	SELECT SUB
 	FROM Users
 	WHERE U_ID = %d;
@@ -653,7 +671,7 @@ func (s *sqlite) LoadSubState (uId uint64) (state bool, err error) {
 	}
 	err = rows.Err()
 	if err != nil {
-			return false, err
+		return false, err
 	}
 	rows.Close()
 	if v == 0 {
@@ -667,11 +685,249 @@ func (s *sqlite) LoadSubState (uId uint64) (state bool, err error) {
 	}
 }
 
-type sqlite struct {
-	*sql.DB
+func (s *sqlite) SaveMem(tId int, slot int, data string) (err error) {
+	var tx *sql.Tx
+	tx, err = s.BeginTx(context.Background(), &sql.TxOptions{
+		Isolation: 0,
+		ReadOnly:  false,
+	})
+	defer func() {
+		if err != nil {
+			logger.Logger.Errorf("[DB] Error found before tx commit: %v", err)
+			err = tx.Rollback()
+			if err != nil {
+				logger.Logger.Errorf("[DB] Rollback error: %s", err)
+			}
+		} else {
+			err = tx.Commit()
+			if err != nil {
+				logger.Logger.Errorf("[DB] Tx commit error: %s", err)
+			}
+		}
+	}()
+	if err != nil {
+		return err
+	}
+
+	stmt := fmt.Sprintf(
+		`
+	INSERT INTO Memories
+		(TRACK, SLOT, TS, JSON)
+	VALUES
+		(%d, %d, %d, '%s')
+	ON CONFLICT(TRACK,SLOT) DO UPDATE SET
+		TS = excluded.TS,
+		JSON = excluded.JSON;
+	`, tId, slot, time.Now().UnixMilli(), data)
+
+	if s.PRINTSTMT {
+		logger.Logger.Info(stmt)
+	}
+
+	_, err = tx.Exec(stmt)
+	return err
 }
 
-func Sqlite () (sv *sqlite, err error) {
+func (s *sqlite) GetLatestMemIndex(tId int) (slot int, err error) {
+
+	query := fmt.Sprintf(
+		`
+	SELECT SLOT, MAX(TS)
+	FROM Memories
+	WHERE TRACK = %d;
+	`, tId)
+
+	var rows *sql.Rows
+	var nullableSlot sql.NullInt32
+	var nullableTs sql.NullInt64
+	rows, err = s.Query(query)
+	defer rows.Close()
+	if err != nil {
+		return 0, err
+	}
+
+	if rows.Next() {
+		err = rows.Scan(&nullableSlot, &nullableTs)
+		if err != nil {
+			return 0, err
+		}
+	}
+
+	if nullableSlot.Valid {
+		slot = int(nullableSlot.Int32)
+	} else {
+		logger.Logger.Errorf("Invalid value")
+		return 0, fmt.Errorf("INVALID")
+	}
+
+	err = rows.Err()
+	if err != nil {
+		return 0, err
+	}
+
+	return
+}
+
+func (s *sqlite) LoadMems(tId int, from int, to int, deserializer func(slot int, data string) error) (err error) {
+	var tx *sql.Tx
+	tx, err = s.BeginTx(context.Background(), &sql.TxOptions{
+		Isolation: 0,
+		ReadOnly:  true,
+	})
+	defer func() {
+		if err != nil {
+			logger.Logger.Errorf("[DB] Error found before tx commit: %v", err)
+			err = tx.Rollback()
+			if err != nil {
+				logger.Logger.Errorf("[DB] Rollback error: %s", err)
+			}
+		} else {
+			err = tx.Commit()
+			if err != nil {
+				logger.Logger.Errorf("[DB] Tx commit error: %s", err)
+			}
+		}
+	}()
+
+	query := fmt.Sprintf(
+		`
+	SELECT SLOT, JSON
+	FROM Memories
+	WHERE TRACK = %d
+	AND SLOT BETWEEN %d AND %d;
+	`, tId, from, to-1)
+
+	var rows *sql.Rows
+	rows, err = s.Query(query)
+	if err != nil {
+		return err
+	}
+
+	var slot int
+	var json string
+	for rows.Next() {
+		err = rows.Scan(&slot, &json)
+		if err != nil {
+			return err
+		}
+		err = deserializer(slot, json)
+		if err != nil {
+			return err
+		}
+	}
+	err = rows.Err()
+	if err != nil {
+		return err
+	}
+	rows.Close()
+
+	return
+}
+
+// func (s *sqlite) SaveMemTrack(tId int, data string) (err error) {
+// 	var tx *sql.Tx
+// 	tx, err = s.BeginTx(context.Background(), &sql.TxOptions{
+// 		Isolation: 0,
+// 		ReadOnly:  false,
+// 	})
+// 	defer func () {
+// 		if err != nil {
+// 			tx.Rollback()
+// 			logger.Logger.Errorf("[DB] Rollback: %s", err)
+// 		} else {
+// 			err = tx.Commit()
+// 			if err != nil {
+// 				tx.Rollback()
+// 				logger.Logger.Errorf("[DB] Rollback: %s", err)
+// 			}
+// 		}
+// 	} ()
+// 	if err != nil {
+// 		return err
+// 	}
+
+// 	stmt := fmt.Sprintf(
+// 	`
+// 	INSERT INTO MemTrackCaches
+// 		(TRACK, DATA)
+// 	VALUES
+// 		(%d, '%s')
+// 	ON DUPLICATE KEY UPDATE
+// 		TRACK = VALUES(TRACK),
+// 		DATA = VALUES(DATA);
+// 	`, tId, data)
+
+// 	if s.PRINTSTMT {
+// 		logger.Logger.Info(stmt)
+// 	}
+// 	_, err = tx.Exec(stmt)
+// 	return err
+// }
+
+// func (s *sqlite) LoadMemTrack (tId int) (trackJson string, err error) {
+// 	var tx *sql.Tx
+// 	tx, err = s.BeginTx(context.Background(), &sql.TxOptions{
+// 		Isolation: 0,
+// 		ReadOnly:  true,
+// 	})
+// 	defer func () {
+// 		if err != nil {
+// 			tx.Rollback()
+// 			logger.Logger.Errorf("[DB] Rollback: %s", err)
+// 		} else {
+// 			err = tx.Commit()
+// 			if err != nil {
+// 				tx.Rollback()
+// 				logger.Logger.Errorf("[DB] Rollback: %s", err)
+// 			}
+// 		}
+// 	} ()
+
+// 	query := fmt.Sprintf(
+// 	`
+// 	SELECT DATA
+// 	FROM MemTrackCaches
+// 	WHERE TRACK = %d;
+// 	`, tId)
+
+// 	var rows *sql.Rows
+// 	rows, err = s.Query(query)
+// 	if err != nil {
+// 		return "", err
+// 	}
+
+// 	var j string
+// 	for rows.Next() {
+// 		err = rows.Scan(&j)
+// 		if err != nil {
+// 			return "", err
+// 		}
+// 	}
+// 	err = rows.Err()
+// 	if err != nil {
+// 		return "", err
+// 	}
+// 	rows.Close()
+// 	logger.Logger.Infof("[DB] Loaded: %s", j)
+
+// 	if len(j) == 0 {
+// 		return "", errors.New("scanned nothing")
+// 	}
+
+// 	err = json.Unmarshal([]byte(j), &trackJson)
+// 	if err != nil {
+// 		return "", err
+// 	}
+
+// 	return
+// }
+
+type sqlite struct {
+	*sql.DB
+	PRINTSTMT bool
+}
+
+func Sqlite(debug bool) (sv *sqlite, err error) {
 	var s *sql.DB
 	s, err = sql.Open("sqlite3", "./db")
 	if err != nil {
@@ -711,6 +967,7 @@ func Sqlite () (sv *sqlite, err error) {
 
 	sv = &sqlite{
 		s,
+		debug,
 	}
 
 	err = sv.tx(`
@@ -750,11 +1007,11 @@ func Sqlite () (sv *sqlite, err error) {
 		logger.Logger.Infof("[Storage] Ensured table \"Commands\".")
 	}
 
-
 	err = sv.tx(`
 	CREATE TABLE IF NOT EXISTS Users (
-		U_ID int,
-		SUB bool
+		U_ID int NOT NULL,
+		SUB bool NOT NULL,
+		PRIMARY KEY (U_ID)
 	)
 	`)
 	if err != nil {
@@ -763,12 +1020,24 @@ func Sqlite () (sv *sqlite, err error) {
 		logger.Logger.Infof("[Storage] Ensured table \"Users\".")
 	}
 
-
-
+	err = sv.tx(`
+	CREATE TABLE IF NOT EXISTS Memories (
+		TRACK int NOT NULL,
+		SLOT int NOT NULL,
+		JSON string NOT NULL,
+		TS int NOT NULL,
+		PRIMARY KEY (TRACK, SLOT)
+	)
+	`)
+	if err != nil {
+		logger.Logger.Fatalf("[Storage] Failed to create table \"Memories\": %s", err)
+	} else {
+		logger.Logger.Infof("[Storage] Ensured table \"Memories\".")
+	}
 	return sv, err
 }
 
-func (s *sqlite) tx (stmt string) error {
+func (s *sqlite) tx(stmt string) error {
 	var tx *sql.Tx
 	var err error
 	tx, err = s.BeginTx(context.Background(), &sql.TxOptions{

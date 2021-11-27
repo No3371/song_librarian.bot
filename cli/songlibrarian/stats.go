@@ -22,7 +22,7 @@ type stats struct {
 	AnalyzedEmbeds      uint64
 	UrlRegexMatched     uint64
 	SkippedDuplicate    uint64
-	PendedSpoilerFlag		uint64
+	PendedSpoilerFlag	uint64
 	Pended              uint64
 	Redirected          uint64
 	GuessRight          uint64
@@ -36,8 +36,15 @@ func (s *stats) Print() {
 	if err != nil {
 		j = []byte("Failed to marshal")
 	}
-	fmt.Printf("Has been running for %s...", time.Since(statSession.StartAt).Round(time.Second))
-	fmt.Printf("\n[STATS] Redirect rate: %0.2f%%\n%s\n", 100*(float64(statSession.Redirected)/float64(statSession.AnalyzedEmbeds)), string(j))
+	passed := time.Since(statSession.StartAt).Round(time.Second)
+	sb := &strings.Builder{}
+	sb.WriteString(fmt.Sprintf("\nUptime: %s", passed))
+	sb.WriteString(fmt.Sprintf("\nAverage msg/hour: %d", statSession.BoundChannelMessage/uint64(passed.Hours())))
+	sb.WriteString(fmt.Sprintf("\nAverage msg/hour: %d", statSession.BoundChannelMessage/uint64(passed.Hours())))
+	sb.WriteString(fmt.Sprintf("\nGuess correctness: %0.2f%%\n%s\n", 100*(float64(statSession.GuessRight)/float64(statSession.Pended))))
+	sb.WriteString(fmt.Sprintf("\nGuess wrongness: %0.2f%%\n%s\n", 100*(float64(statSession.GueseWrongType)/float64(statSession.Pended))))
+	sb.WriteString(string(j))
+	fmt.Printf(sb.String())
 }
 
 type badGuessRecord struct {
@@ -47,29 +54,33 @@ type badGuessRecord struct {
 }
 
 func init () {
-	badGuesses = [256]badGuessRecord{}
+	badGuesses = [1024]badGuessRecord{}
 }
 
-var badGuesses [256]badGuessRecord
+var badGuesses [1024]badGuessRecord
 var badGuessIndex int
 
 func noteGuessedWrong (r badGuessRecord) {
 	badGuesses[badGuessIndex] = r
 	badGuessIndex++
-	if badGuessIndex >= 255 {
+	if badGuessIndex >= 1023 {
 		badGuessIndex = 0
 	}
 }
 
 func printBadGuesses () {
 	sb := &strings.Builder {}
-	for i := 0; i < 256; i++ {
+	for i := 0; i < 1024; i++ {
 		r := badGuesses[i]
 		if r.title == "" {
 			continue
 		}
 
-		sb.WriteString(fmt.Sprintf("\n%s -> %s / %s", redirect.RedirectTypetoString(r.guess), redirect.RedirectTypetoString(r.result), r.title))
+		if r.result != redirect.None {
+			sb.WriteString(fmt.Sprintf("\n  %s -> %s / %s", redirect.RedirectTypetoString(r.guess), redirect.RedirectTypetoString(r.result), r.title))
+		} else {
+			sb.WriteString(fmt.Sprintf("\n%s -> %s / %s", redirect.RedirectTypetoString(r.guess), redirect.RedirectTypetoString(r.result), r.title))
+		}
 	}
 	fmt.Println(sb.String())
 }

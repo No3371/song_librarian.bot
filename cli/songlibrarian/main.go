@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"runtime"
+	"runtime/debug"
 	"runtime/pprof"
 	"sync/atomic"
 
@@ -18,6 +19,7 @@ import (
 	"No3371.github.com/song_librarian.bot/binding"
 	"No3371.github.com/song_librarian.bot/locale"
 	"No3371.github.com/song_librarian.bot/logger"
+	"No3371.github.com/song_librarian.bot/memory"
 	"No3371.github.com/song_librarian.bot/redirect"
 	"No3371.github.com/song_librarian.bot/storage"
 	"github.com/diamondburned/arikawa/v3/api"
@@ -29,7 +31,7 @@ import (
 
 
 var pendingEmbeds chan *pendingEmbed
-var sv storage.StorageProvider
+var sp storage.StorageProvider
 
 type pendingEmbed struct {
 	cId discord.ChannelID
@@ -71,13 +73,13 @@ func main() {
 	}
 
 	if *globalFlags.dev {
+		runtime.SetCPUProfileRate(200)
         f, err := os.Create("./cpuprof")
         if err != nil {
             logger.Logger.Fatalf("could not create CPU profile: ", err)
         }
         defer f.Close() // error handling omitted for example
 		logger.Logger.Infof("Starting cpu profiling...")
-		runtime.SetCPUProfileRate(200)
         if err := pprof.StartCPUProfile(f); err != nil {
             logger.Logger.Fatalf("could not start CPU profile: ", err)
         }
@@ -86,8 +88,8 @@ func main() {
 	// sigs := make(chan os.Signal, 1)
 
     // signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
-	
-	
+
+
 
 	processCloser = make(chan struct{})
 
@@ -118,21 +120,19 @@ func main() {
 		loopTimer.Reset(time.Second * 10)
 	}
 	statSession.Print()
-	logger.Logger.Infof("SAVE ALL running")
-	binding.SaveAll()
-	logger.Logger.Infof("SAVE ALL finished")
 	os.Exit(0)
 }
 
 func session (sCloser chan struct{}) (err error) {
 	var sessionSelfCloser chan struct{} = make(chan struct{})
 	logger.Logger.Infof("[MAIN] Session is starting...")
-	sv, err = storage.Sqlite()
+	sp, err = storage.Sqlite(*globalFlags.printSqlStmt)
 	if err != nil {
 		return errors.Wrap(err, "Failed to get storage")
 	}
 
-	binding.Setup(sv)
+	binding.Setup(sp)
+	memory.Setup(sp)
 
 	s, err := state.New("Bot " + *globalFlags.token)
 	if err != nil {
@@ -145,8 +145,6 @@ func session (sCloser chan struct{}) (err error) {
 
 	pendingEmbeds = make(chan *pendingEmbed, 512)
 
-	redirectorClosed := redirectorLoop(s, sessionSelfCloser)
-
 	err = assureCommands(s)
 	if err != nil {
 		logger.Logger.Fatalf("[MAIN] %v", err)
@@ -154,6 +152,8 @@ func session (sCloser chan struct{}) (err error) {
 
 	addEventHandlers(s)
 	addInteractionHandlers(s)
+
+	redirectorClosed := redirectorLoop(s, sessionSelfCloser)
 
 	s.ErrorLog = func(innerErr error) {
 		logger.Logger.Errorf("[MAIN] Gateway error: %v", innerErr)
@@ -229,7 +229,10 @@ func session (sCloser chan struct{}) (err error) {
 	case <-time.NewTimer(time.Second*5).C:
 	}
 	<-redirectorClosed
-	err = sv.Close()
+	logger.Logger.Infof("SAVE ALL running")
+	binding.SaveAll()
+	logger.Logger.Infof("SAVE ALL finished")
+	err = sp.Close()
 	if err != nil {
 		return err
 	}
@@ -248,12 +251,17 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 			defer func () {
 				if err == nil {
 					if pErr := recover(); pErr != nil {
-						err = pErr.(error)
+						logger.Logger.Errorf("TARCING PANIC:\n", debug.Stack())
+						err = fmt.Errorf("PANIC: %v", pErr)
 					}
 				}
 			} ()
-			logger.Logger.Infof("Redirector: %s-%d", p.taskId, p.embedIndex)
-			
+			logger.Logger.Infof("Redirector [%s-%d]", p.taskId, p.embedIndex)
+
+			var _binding = binding.QueryBinding(p.bindingId)
+			if _binding == nil {
+				panic("nil binding")
+			}
 			var botMsg *discord.Message
 			var originalMsg *discord.Message
 
@@ -261,35 +269,44 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 				panic("nil pended?")
 			}
 
-			for time.Now().Before(p.estimatedRTime) {
-				t.Reset(time.Second * 7)
+			for time.Now().Before(p.estimatedRTime.Add(time.Second * 2)) {
+				t.Reset(time.Second * 16)
 				<-t.C
-				
-				botMsg, originalMsg, err = validate(s, p.cId, p.msgID)
+				botMsg, originalMsg, err = validate(s, p)
 				if botMsg == nil || originalMsg == nil {
 					if err != nil {
 						logger.Logger.Errorf("Failed to validate: %v", err)
 					}
-					if originalMsg != nil {
-						memorizeResult(originalMsg.Embeds[p.embedIndex].URL, CancelledWithError)
-					}
-					return
+					break // Do not cancel here, we still have one more chance down there (Somehow sometimes Discord randomly return 404 for message?)
 				}
 			}
-			
 
 			// Do it again because passed < delay may not always be true
-			botMsg, originalMsg, err = validate(s, p.cId, p.msgID)
+			botMsg, originalMsg, err = validate(s, p)
 			if botMsg == nil || originalMsg == nil {
 				if err != nil {
 					logger.Logger.Errorf("Failed to validate: %v", err)
 				}
 				if originalMsg != nil {
-					memorizeResult(originalMsg.Embeds[p.embedIndex].URL, CancelledWithError)
+					err = _binding.Memorize(originalMsg.Embeds[p.embedIndex].URL, memory.CancelledWithError)
+					if err != nil {
+						logger.Logger.Errorf("[%s-%d] Failed to memorize.", p.taskId, p.embedIndex)
+					}
 				}
 				return
 			}
-	
+
+			lastRedirectTime := _binding.GetLastTime(originalMsg.Embeds[p.embedIndex].URL, memory.Redirected)
+			if time.Since(lastRedirectTime) < time.Minute { // Handles user racing
+				logger.Logger.Infof("  [%s-%d] Seems like it just got redirected, abort.", p.taskId, p.embedIndex)
+				err = s.DeleteMessage(botMsg.ChannelID, botMsg.ID, "Temporary bot message")
+				if err != nil {
+					// Failed to remove the bot message...?
+					logger.Logger.Errorf("Failed to remove the bot message: %d", err)
+				}
+				return
+			}
+
 			var communityVotes int
 			var finalType redirect.RedirectType
 			var result resultType = FALLBACK
@@ -316,7 +333,10 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 					// Failed to remove the bot message...?
 					logger.Logger.Errorf("Failed to remove the bot message: %v", err)
 				}
-				memorizeResult(originalMsg.Embeds[p.embedIndex].URL, Cancelled)
+				err = _binding.Memorize(originalMsg.Embeds[p.embedIndex].URL, memory.Cancelled)
+				if err != nil {
+					logger.Logger.Errorf("[%s-%d] Failed to memorize.", p.taskId, p.embedIndex)
+				}
 				return
 			}
 
@@ -333,7 +353,10 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 					logger.Logger.Errorf("Failed to remove the bot message: %d", err)
 				}
 				if originalMsg != nil {
-					memorizeResult(originalMsg.Embeds[p.embedIndex].URL, CancelledWithError)
+					err = _binding.Memorize(originalMsg.Embeds[p.embedIndex].URL, memory.CancelledWithError)
+					if err != nil {
+						logger.Logger.Errorf("[%s-%d] Failed to memorize.", p.taskId, p.embedIndex)
+					}
 				}
 				return
 			}
@@ -383,13 +406,15 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 				}
 			}
 
-			
 			var data *api.SendMessageData
 			data, err = prepareRedirectionMessage(originalMsg, p, result)
 			if err != nil {
 				logger.Logger.Errorf("Failed to prepare redirection message!\n%v", err)
 				if originalMsg != nil {
-					memorizeResult(originalMsg.Embeds[p.embedIndex].URL, CancelledWithError)
+					err = _binding.Memorize(originalMsg.Embeds[p.embedIndex].URL, memory.CancelledWithError)
+					if err != nil {
+						logger.Logger.Errorf("[%s-%d] Failed to memorize.", p.taskId, p.embedIndex)
+					}
 				}
 				return
 			}
@@ -415,9 +440,12 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 				}
 			}
 
-			memorizeResult(originalMsg.Embeds[p.embedIndex].URL, Redirected)
+			err = _binding.Memorize(originalMsg.Embeds[p.embedIndex].URL, memory.Redirected)
+			if err != nil {
+				logger.Logger.Errorf("  [%s-%d] Failed to memorize.", p.taskId, p.embedIndex)
+			}
 
-			logger.Logger.Infof("  Redirected     c%d - m%d", destCId, rm.ID)	
+			logger.Logger.Infof("  [%s-%d] Redirected     c%d - m%d", p.taskId, p.embedIndex, destCId, rm.ID)	
 			atomic.AddUint64(&statSession.Redirected, 1)
 
 			err = s.DeleteMessage(botMsg.ChannelID, botMsg.ID, "Temporary bot message")
@@ -428,21 +456,20 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 	
 			return nil
 		}
+
 		rLoop: for {
 			select {
 			case p := <-pendingEmbeds: // block until new pending
 				if rErr := processRedirect(p); rErr != nil {
-					logger.Logger.Infof("Redirector task failed with: %v", rErr)
+					logger.Logger.Errorf("Redirector task failed with: %v", rErr)
 				}
-				break
 			case <-loopCloser:
 				endingLoop: for {
 					select {
 					case p := <-pendingEmbeds: // block until new pending
 						if rErr := processRedirect(p); rErr != nil {
-							logger.Logger.Infof("Redirector task failed with: %v", rErr)
+							logger.Logger.Errorf("Redirector task failed with: %v", rErr)
 						}
-						break
 					default:
 						break endingLoop
 					}
@@ -534,109 +561,101 @@ func decideType (pending *pendingEmbed, botMsg *discord.Message) (rType redirect
 
 	}
 
-	var c_o, c_c, c_s, c_n int
+	var cO, cC, cS, cX int
 
 	for _, r := range botMsg.Reactions {
 		switch r.Emoji.Name {
 		case reactionCover:
-			c_c = r.Count
+			cC = r.Count
 			break
 		case reactionOriginal:
-			c_o = r.Count
+			cO = r.Count
 			break
 		case reactionStream:
-			c_s = r.Count
+			cS = r.Count
 			break
 		case reactionNone:
-			c_n = r.Count
+			cX = r.Count
 			break
 		}
 	}
 
-	communityVotes = c_o + c_c + c_s + c_n
+	communityVotes = cO + cC + cS + cX
 
+	// If no user vote
 	if communityVotes == 0  {
 		if pending.isDup { // Skip duplicates
 			logger.Logger.Infof("  [%s-%d] DUPLICATE", pending.taskId, pending.embedIndex)
 			atomic.AddUint64(&statSession.SkippedDuplicate, 1)
 			return redirect.None, 0, nil
 		}
-		// If no user vote
+
 		if pending.preType == redirect.Unknown { //  and no pre_type, apply guess
 			switch pending.autoType {
 				case redirect.Original:
-					c_o++
-					break
+					cO++
 				case redirect.Cover:
-					c_c++
-					break
+					cC++
 				case redirect.Stream:
-					c_s++
-					break
+					cS++
 			}
 		} else { // accept the pre_type
 			switch pending.preType {
 			case redirect.Original:
-				c_o++
-				break
+				cO++
 			case redirect.Cover:
-				c_c++
-				break
+				cC++
 			case redirect.Stream:
-				c_s++
-				break
+				cS++
 			}
 		}
 	} else {
 		if pending.autoType == pending.preType {
 			switch pending.autoType {
 				case redirect.Original:
-					c_o++
-					break
+					cO++
 				case redirect.Cover:
-					c_c++
-					break
+					cC++
 				case redirect.Stream:
-					c_s++
-					break
+					cS++
 			}
 		}
 	}
 
-	sum := c_o + c_c + c_s
+	sum := cO + cC + cS
 
-	if sum == 0 || (c_n > c_o - 1 && c_n > c_c - 1 && c_n > c_s - 1) {
+	if sum == 0 || (cX > cO - 1 && cX > cC - 1 && cX > cS - 1) { // X has higher power
 		if pending.autoType == redirect.None {
-			logger.Logger.Infof("  [%s-%d] CANCEL   | o%d c%d s%d n%d ✔️", pending.taskId, pending.embedIndex, c_o, c_c, c_s, c_n)
+			logger.Logger.Infof("  [%s-%d] CANCEL   | o%d c%d s%d x%d ✔️", pending.taskId, pending.embedIndex, cO, cC, cS, cX)
 		} else {
-			logger.Logger.Infof("  [%s-%d] CANCEL   | o%d c%d s%d n%d ❓", pending.taskId, pending.embedIndex, c_o, c_c, c_s, c_n)
+			logger.Logger.Infof("  [%s-%d] CANCEL   | o%d c%d s%d x%d ❓", pending.taskId, pending.embedIndex, cO, cC, cS, cX)
 		}
 		return redirect.None, communityVotes, nil
 	}
 
-	if c_o > c_c && c_o > c_s {
+	if cO > cC && cO > cS {
 		if pending.autoType == redirect.Original {
-			logger.Logger.Infof("  [%s-%d] ORIGINAL | o%d c%d s%d n%d ✔️", pending.taskId, pending.embedIndex, c_o, c_c, c_s, c_n)
+			logger.Logger.Infof("  [%s-%d] ORIGINAL | o%d c%d s%d x%d ✔️", pending.taskId, pending.embedIndex, cO, cC, cS, cX)
 		} else {
-			logger.Logger.Infof("  [%s-%d] ORIGINAL | o%d c%d s%d n%d ❓", pending.taskId, pending.embedIndex, c_o, c_c, c_s, c_n)
+			logger.Logger.Infof("  [%s-%d] ORIGINAL | o%d c%d s%d x%d ❓", pending.taskId, pending.embedIndex, cO, cC, cS, cX)
 		}
 		rType = redirect.Original
 	}
 
-	if c_s > c_c && c_s > c_o {
+	if cS > cC && cS > cO {
 		if pending.autoType == redirect.Stream {
-			logger.Logger.Infof("  [%s-%d] STREAM   | o%d c%d s%d n%d ✔️", pending.taskId, pending.embedIndex, c_o, c_c, c_s, c_n)
+			logger.Logger.Infof("  [%s-%d] STREAM   | o%d c%d s%d x%d ✔️", pending.taskId, pending.embedIndex, cO, cC, cS, cX)
 		} else {
-			logger.Logger.Infof("  [%s-%d] STREAM   | o%d c%d s%d n%d ❓", pending.taskId, pending.embedIndex, c_o, c_c, c_s, c_n)
+			logger.Logger.Infof("  [%s-%d] STREAM   | o%d c%d s%d x%d ❓", pending.taskId, pending.embedIndex, cO, cC, cS, cX)
 		}
 		rType = redirect.Stream
 	}
 
-	if c_c > c_s && c_c > c_o {
+	if cC > cS && cC > cO {
 		if pending.autoType == redirect.Cover {
-			logger.Logger.Infof("  [%s-%d] COVER    | o%d c%d s%d n%d ✔️", pending.taskId, pending.embedIndex, c_o, c_c, c_s, c_n)
+			logger.Logger.Infof("  [%s-%d] COVER    | o%d c%d s%d x%d ✔️", pending.taskId, pending.embedIndex, cO, cC, cS, cX)
 		} else {
-			logger.Logger.Infof("  [%s-%d] COVER    | o%d c%d s%d n%d ❓", pending.taskId, pending.embedIndex, c_o, c_c, c_s, c_n)
+			logger.Logger.Infof("  [%s-%d] COVER    | o%d c%d s%d x%d ❓", pending.taskId, pending.embedIndex, cO, cC, cS, cX)
 		}
 		rType = redirect.Cover
 	}
@@ -644,24 +663,25 @@ func decideType (pending *pendingEmbed, botMsg *discord.Message) (rType redirect
 	return rType, communityVotes, nil
 }
 
-func validate (s *state.State, botMsgCId discord.ChannelID, botMsgID discord.MessageID) (botMsg *discord.Message, originalMsg *discord.Message, err error) {
-	botMsg, err = s.Message(botMsgCId, botMsgID)
+func validate (s *state.State, task *pendingEmbed) (botMsg *discord.Message, originalMsg *discord.Message, err error) {
+	botMsg, err = s.Message(task.cId, task.msgID)
 	if err != nil || botMsg == nil {
 		// Failed to access the bot message, deleted?
-		logger.Logger.Errorf("Bot message inaccessible: %d", botMsgCId)
+		logger.Logger.Errorf("Bot message inaccessible: %d", task.cId)
 		return botMsg, originalMsg, err
 	} else {
 		if originalMsg, err = s.Message(botMsg.Reference.ChannelID, botMsg.Reference.MessageID); originalMsg == nil || err != nil {
-			logger.Logger.Errorf("Original message inaccessible (error? %v", err)
+			logger.Logger.Errorf("[%s-%d] Original message inaccessible (error? %v", task.taskId, task.embedIndex, err)
 			err = s.DeleteMessage(botMsg.ChannelID, botMsg.ID, "Temporary bot message")
 			if err != nil {
 				// Failed to remove the bot message...?
-				logger.Logger.Errorf("Failed to remove the bot message: %d", err)
+				logger.Logger.Errorf("Failed to remove the bot message: %s", err)
 			} else {
 				botMsg = nil
 			}
 			return botMsg, originalMsg, err
 		}
 	}
+	
 	return botMsg, originalMsg, nil
 }

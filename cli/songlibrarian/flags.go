@@ -15,6 +15,7 @@ type flags struct {
 	delay *time.Duration
 	controlPort *uint16
 	cooldown *time.Duration
+	printSqlStmt *bool
 }
 
 var globalFlags *flags
@@ -24,6 +25,7 @@ func resolveFlags () {
 		globalFlags = &flags{}
 	}
 	globalFlags.dev = flag.Bool("dev", false, "development mode")
+	globalFlags.printSqlStmt = flag.Bool("debug_sql", false, "")
 	globalFlags.debugRegex = flag.Bool("regex", false, "")
 	globalFlags.appid = flag.Int64("appid", 0, "discord app id")
 	globalFlags.token = flag.String("token", "", "discord bot token")

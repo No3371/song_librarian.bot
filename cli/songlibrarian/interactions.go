@@ -31,11 +31,10 @@ func addInteractionHandlers(s *state.State) {
 		}
 		switch e.Type {
 		case discord.CommandInteraction:
-			logger.Logger.Infof("CommandInteraction")
 			var data = e.Data.(*discord.CommandInteractionData)
 			switch commandIdMap[data.ID] {
 			case DeleteRedirectedMessage:
-				logger.Logger.Infof("  DELETE")
+				logger.Logger.Infof("Command: DELETE >")
 				if len(data.Options) < 2 {
 					logger.Logger.Infof("Need atleast 2 options provided")
 					return
@@ -43,7 +42,7 @@ func addInteractionHandlers(s *state.State) {
 				var cId uint64
 				cId, err = strconv.ParseUint(data.Options[0].String(), 10, 64)
 				if err != nil {
-					logger.Logger.Infof("Failed to parse channel Id: %s", data.Options[0])
+					logger.Logger.Infof("  < Failed to parse channel Id: %s", data.Options[0])
 					return
 				}
 				deleted := make([]string, 0)
@@ -52,19 +51,19 @@ func addInteractionHandlers(s *state.State) {
 					var mId uint64
 					mId, err = strconv.ParseUint(data.Options[i].String(), 10, 64)
 					if err != nil {
-						logger.Logger.Infof("Failed to parse message Id: %s", data.Options[i].String())
+						logger.Logger.Infof("  < Failed to parse message Id: %s", data.Options[i].String())
 						return
 					}
 					var m *discord.Message
 					if m, err = s.Message(discord.ChannelID(cId), discord.MessageID(mId)); err == nil && m != nil && m.Author.ID == me.ID {
-						logger.Logger.Infof("  #%d Message fetched and it's mine.", i)
+						logger.Logger.Infof("    #%d Message fetched and it's mine.", i)
 						err = s.DeleteMessage(m.ChannelID, m.ID, "Requested")
 						if err != nil {
-							logger.Logger.Errorf("  DeleteMessage err: %v", err)
+							logger.Logger.Errorf("    < DeleteMessage err: %v", err)
 							continue
 						} else {
 							deleted = append(deleted, m.URL())
-							logger.Logger.Infof("  Deleted.")
+							logger.Logger.Infof("    < Deleted.")
 						}
 					}
 				}

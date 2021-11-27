@@ -10,6 +10,7 @@ import (
 	"No3371.github.com/song_librarian.bot/binding"
 	"No3371.github.com/song_librarian.bot/locale"
 	"No3371.github.com/song_librarian.bot/logger"
+	"No3371.github.com/song_librarian.bot/memory"
 	"No3371.github.com/song_librarian.bot/redirect"
 	"github.com/diamondburned/arikawa/v3/api"
 	"github.com/diamondburned/arikawa/v3/discord"
@@ -26,7 +27,8 @@ func init () {
 }
 
 type mHandleSession struct {
-	rId string
+	randomId string
+	bindingId int
 	cId discord.ChannelID
 	mId discord.MessageID
 	msg *discord.Message
@@ -70,7 +72,7 @@ func addEventHandlers (s *state.State) (err error){
 
 
 		buffer<-&mHandleSession{
-			rId: getRandomID(3),
+			randomId: getRandomID(3),
 			cId: e.Message.ChannelID,
 			mId: e.Message.ID,
 		}
@@ -87,7 +89,7 @@ func handlerLoop (s *state.State) {
 		atomic.AddUint64(&statSession.MessageBuffered, 1)
 		item.msg, err = s.Message(item.cId, item.mId)
 		if item.msg == nil || err != nil {
-			logger.Logger.Infof("[HANDLER] [%s] Buffered item invalid. error? %v", item.rId, err)
+			logger.Logger.Infof("[HANDLER] [%s] Buffered item invalid. error? %v", item.randomId, err)
 			continue
 		}
 
@@ -100,10 +102,10 @@ func handlerLoop (s *state.State) {
 			fetchDelayTimer.Reset(time.Second * 3)
 			item.msg, err = s.Message(item.cId, item.mId)
 			if err != nil || item.msg == nil {
-				logger.Logger.Errorf("[%s] Retrying because failed to fetch message: %v", item.rId, err)
+				logger.Logger.Errorf("[%s] Retrying because failed to fetch message: %v", item.randomId, err)
 				item.msg, err = s.Message(item.cId, item.mId)
 				if err != nil || item.msg == nil {
-					logger.Logger.Errorf("[%s] Retry failed too, ABORT: %v", item.rId, err)
+					logger.Logger.Errorf("[%s] Retry failed too, ABORT: %v", item.randomId, err)
 					continue
 				}
 			}
@@ -114,7 +116,7 @@ func handlerLoop (s *state.State) {
 
 		err = onMessageCreated(s, item)
 		if err != nil {
-			logger.Logger.Errorf("[HANDLER] [%s] OnMessageCreated error: %v", item.rId, err)
+			logger.Logger.Errorf("[HANDLER] [%s] OnMessageCreated error: %v", item.randomId, err)
 		}
 	}
 
@@ -131,7 +133,7 @@ func onMessageCreated (s *state.State, task *mHandleSession) (err error) {
 		for bId := range bIds {
 			b := binding.QueryBinding(bId)
 			if b == nil {
-				logger.Logger.Errorf("[%s] A binding Id is pointing to nil Binding: %d", task.rId, bId)
+				logger.Logger.Errorf("[%s] A binding Id is pointing to nil Binding: %d", task.randomId, bId)
 				continue
 			}
 
@@ -140,7 +142,7 @@ func onMessageCreated (s *state.State, task *mHandleSession) (err error) {
 				fetchDelayTimer.Reset(time.Second * 3)
 				task.msg, err = s.Message(task.msg.ChannelID, task.msg.ID)
 				if task.msg == nil || err != nil {
-					logger.Logger.Errorf("[%s] The message is gone!? Abort!\n%v (%s)", task.rId, err, )
+					logger.Logger.Errorf("[%s] The message is gone!? Abort!\n%v (%s)", task.randomId, err, )
 					return
 				}
 				if len(task.msg.Embeds) == 0 {
@@ -195,12 +197,13 @@ func onMessageCreated (s *state.State, task *mHandleSession) (err error) {
 			// Find all bindings bound
 			// For each binding, for each redirection, if the regex match...
 			for ei, e := range task.msg.Embeds {
-				logger.Logger.Infof("💬 %s (%s) / %s-%d", e.Title, e.URL, task.rId, ei)
+				logger.Logger.Infof("💬 %s-%d / %s (%s)", task.randomId, ei, e.Title, e.URL)
 				atomic.AddUint64(&statSession.AnalyzedEmbeds, 1)
 				urlMatching: for i := 0; i < urlRegexCount; i++ {
 					if b.UrlRegexEnabled(i) {
 						if isMatch, _ := regexUrlMapping[i].MatchString(e.URL); isMatch {
 							atomic.AddUint64(&statSession.UrlRegexMatched, 1)
+							task.bindingId = bId
 							if err := pendEmbed(s, task, ei, bId); err != nil {
 								logger.Logger.Errorf("%s", err)
 								continue
@@ -224,25 +227,24 @@ func pendEmbed (s *state.State, task *mHandleSession, eIndex int, bId int) (err 
 	var sendMessageData api.SendMessageData = api.SendMessageData{
 		Reference: &discord.MessageReference{ MessageID: task.msg.ID},
 	}
-	var autoType redirect.RedirectType
+	var guessType redirect.RedirectType
 
-	var lastProcessedTime, lastSharedTime, lastRedirectTime, lastResultTime time.Time
-	var lastMem memState
-	lastMem, lastResultTime = getLastState(embed.URL)
-	_, lastSharedTime = getLastShared(embed.URL)
-	_, lastRedirectTime = getLastRedirected(embed.URL)
-	_, lastProcessedTime = getLastResult(embed.URL)
-	logger.Logger.Infof("  [%s] Memory: %s (%s) | %d", task.rId, memStateToString(lastMem), lastResultTime.Sub(time.Now()), memPointer)
-	
-	var redirectedRecently bool = false
-	if (lastMem == Redirected || lastMem == Cancelled) && time.Now().Sub(lastRedirectTime) < *globalFlags.cooldown {
-		redirectedRecently = true
-	}
-
-	autoType, err = guess(task, eIndex)
+	guessType, err = guess(task, eIndex)
 	if err != nil {
 		logger.Logger.Errorf("  Guessing error: %v", err)
-		autoType = redirect.Unknown
+		guessType = redirect.Unknown
+	}
+
+	_binding := binding.QueryBinding(task.bindingId)
+	last, lastTouched := _binding.GetLastState(embed.URL)
+	var lastSharedTime, lastRedirectTime time.Time
+	lastSharedTime = _binding.GetLastTime(embed.URL, memory.Shared)
+	lastRedirectTime = _binding.GetLastTime(embed.URL, memory.Redirected)
+	logger.Logger.Infof("  [%s-%d] Memory: %s (%s) | %d", task.randomId, eIndex, memory.MemStateToString(last), lastTouched.Sub(time.Now()), _binding.MemPointer)
+
+	var redirectedRecently bool = false
+	if time.Now().Sub(lastRedirectTime) < *globalFlags.cooldown {
+		redirectedRecently = true
 	}
 
 	var delay time.Duration = *globalFlags.delay
@@ -257,18 +259,18 @@ func pendEmbed (s *state.State, task *mHandleSession, eIndex int, bId int) (err 
 	if hasSpoilerTag {
 		logger.Logger.Infof("  Spoiler tag detected." )
 		delay = delay * 4 / 10
-		passed := time.Now().Sub(lastResultTime).Round(time.Second)
+		passed := time.Now().Sub(lastTouched).Round(time.Second)
 		if redirectedRecently {
 			sendMessageData.Content = fmt.Sprintf(locale.DETECTED_SPOILER_DUPLICATE, embed.Title, passed, delay.Seconds())
 		} else {
 			sendMessageData.Content = fmt.Sprintf(locale.DETECTED_SPOILER, embed.Title, delay.Seconds())
 		}
-		autoType = redirect.None
+		guessType = redirect.None
 	} else if preType != redirect.Unknown { // If not UNKNOWN, accept the preype
 		var typeLocale string
 
 		if redirectedRecently {
-			switch preType { 
+			switch preType {
 			case redirect.Original:
 				typeLocale = locale.ORIGINAL_UNSIGNED // UNSIGNED
 				logger.Logger.Infof("  pre_typed: o" )
@@ -287,8 +289,8 @@ func pendEmbed (s *state.State, task *mHandleSession, eIndex int, bId int) (err 
 				break
 			}
 			delay = delay * 5 / 10
-			passed := time.Now().Sub(lastResultTime).Round(time.Second)
-			if autoType == preType {
+			passed := time.Now().Sub(lastTouched).Round(time.Second)
+			if guessType == preType {
 				sendMessageData.Content = fmt.Sprintf(locale.DETECTED_PRE_TYPED_AGREED_DUPLICATE, embed.Title, typeLocale, passed, delay.Seconds())
 			} else {
 				sendMessageData.Content = fmt.Sprintf(locale.DETECTED_PRE_TYPED_DUPLICATE, embed.Title, typeLocale, passed, delay.Seconds())
@@ -312,16 +314,16 @@ func pendEmbed (s *state.State, task *mHandleSession, eIndex int, bId int) (err 
 				logger.Logger.Infof("  pre_typed: x" )
 				break
 			}
-			if autoType == preType {
+			if guessType == preType {
 				if preType == redirect.None {
-					delay = delay * 3 / 10			
+					delay = delay * 3 / 10
 				} else {
 					delay = delay * 5 / 10
 				}
 				sendMessageData.Content = fmt.Sprintf(locale.DETECTED_PRE_TYPED_AGREED, embed.Title, typeLocale, delay.Seconds())
 			} else {
 				if preType == redirect.None {
-					delay = delay * 4 / 10			
+					delay = delay * 4 / 10
 				} else {
 					delay = delay * 7 / 10
 				}
@@ -331,9 +333,9 @@ func pendEmbed (s *state.State, task *mHandleSession, eIndex int, bId int) (err 
 
 
 	} else {
-		passed := time.Now().Sub(lastResultTime).Round(time.Second)
 		if redirectedRecently {
-			switch autoType {
+			passed := time.Now().Sub(lastRedirectTime).Round(time.Second)
+			switch guessType {
 			case redirect.Original:
 				delay = delay / 2
 				sendMessageData.Content = fmt.Sprintf(locale.DETECTED_DUPLICATE, embed.Title, locale.ORIGINAL_UNSIGNED, passed ,delay.Seconds())
@@ -355,11 +357,12 @@ func pendEmbed (s *state.State, task *mHandleSession, eIndex int, bId int) (err 
 				break
 			case redirect.Clip:
 				sendMessageData.Content = fmt.Sprintf(locale.DETECTED_CLIPS_DUPLICATE, embed.Title, passed, delay.Seconds())
-				autoType = redirect.None
+				guessType = redirect.None
 			}
 
 		} else {
-			switch autoType {
+			passed := time.Now().Sub(lastTouched).Round(time.Second)
+			switch guessType {
 			case redirect.Original:
 					sendMessageData.Content = fmt.Sprintf(locale.DETECTED, embed.Title, locale.ORIGINAL, delay.Seconds())
 			case redirect.Cover:
@@ -369,10 +372,10 @@ func pendEmbed (s *state.State, task *mHandleSession, eIndex int, bId int) (err 
 					sendMessageData.Content = fmt.Sprintf(locale.DETECTED, embed.Title, locale.STREAM, delay.Seconds())
 				break
 			case redirect.None:
-				if lastMem == Cancelled {
+				if last == memory.Cancelled {
 					delay = delay / 2
 					sendMessageData.Content = fmt.Sprintf(locale.DETECTED_MATCH_NONE_AND_CANCELLED, embed.Title, passed, delay.Seconds())
-				} else if lastMem > None && lastProcessedTime.Before(lastSharedTime) {
+				} else if last > memory.None && lastTouched.Before(lastSharedTime) {
 					delay = delay * 2 / 3
 					passed = time.Now().Sub(lastSharedTime).Round(time.Second)
 					sendMessageData.Content = fmt.Sprintf(locale.DETECTED_MATCH_NONE_AND_SHARED, embed.Title, passed, delay.Seconds())
@@ -384,13 +387,13 @@ func pendEmbed (s *state.State, task *mHandleSession, eIndex int, bId int) (err 
 				sendMessageData.Content = fmt.Sprintf(locale.DETECTED_UNKNOWN, embed.Title, delay.Seconds())
 				break
 			case redirect.Clip:
-				if lastMem == Cancelled {
+				if last == memory.Cancelled {
 					delay = delay / 3
 					sendMessageData.Content = fmt.Sprintf(locale.DETECTED_CLIPS_AND_CANCELLED, embed.Title, passed, delay.Seconds())
 				} else {
 					sendMessageData.Content = fmt.Sprintf(locale.DETECTED_CLIPS, embed.Title, delay.Seconds())
 				}
-				autoType = redirect.None
+				guessType = redirect.None
 			}
 
 		}
@@ -399,12 +402,12 @@ func pendEmbed (s *state.State, task *mHandleSession, eIndex int, bId int) (err 
 	if *globalFlags.dev {
 		delay /= 4
 	}
-	if err = memorizeShared(embed.URL); err != nil {
-		logger.Logger.Errorf("  [%s] Failed to memorizedPended: %v", task.rId, err)
+	if err = _binding.Memorize(embed.URL, memory.Pended); err != nil {
+		logger.Logger.Errorf("  [%s] Failed to memorized(Pended): %v", task.randomId, err)
 	}
 	botM, err := s.SendMessageComplex(task.msg.ChannelID, sendMessageData)
 	if err != nil {
-		logger.Logger.Errorf("[%s-%d] %v", task.rId, eIndex, err)
+		logger.Logger.Errorf("[%s-%d] %v", task.randomId, eIndex, err)
 		return err
 	}
 
@@ -452,10 +455,10 @@ func pendEmbed (s *state.State, task *mHandleSession, eIndex int, bId int) (err 
 		msgID: botM.ID,
 		embedIndex: eIndex,
 		urlValidation: task.msg.Embeds[eIndex].URL,
-		taskId: task.rId,
+		taskId: task.randomId,
 		bindingId: bId,
 		estimatedRTime: time.Now().Add(delay),
-		autoType: autoType,
+		autoType: guessType,
 		preType: preType,
 		isDup: redirectedRecently,
 		spoiler: hasSpoilerTag,
@@ -465,8 +468,8 @@ func pendEmbed (s *state.State, task *mHandleSession, eIndex int, bId int) (err 
 		atomic.AddUint64(&statSession.PendedSpoilerFlag, 1)
 	}
 
-	if err = memorizePended(embed.URL); err != nil {
-		logger.Logger.Errorf("  [%s] Failed to memorizedPended: %v", task.rId, err)
+	if err = _binding.Memorize(embed.URL, memory.Pended); err != nil {
+		logger.Logger.Errorf("  [%s] Failed to memorized(Pended): %v", task.randomId, err)
 	}
 
 	return nil
@@ -514,24 +517,27 @@ func guess (task *mHandleSession, eIndex int) (redirectType redirect.RedirectTyp
 	}
 
 	var countO = 0
+	var countOPlus = 0
 	var countNotO = 0
 	var countDNotO = 0
 	var countC = 0
+	var countCPlus = 0
 	var countDC = 0
 	var countNotC = 0
 	var countS = 0
+	var countSPlus = 0
 	var countNotS = 0
 	var countBadForAll = 0
 
 	// ! NOTE: Discord does not provide full description
 
-	countBadForAll, err = countMatch(sb, "BadForAll", regexBadForAll, embed.Title)
+	countC, err = countMatch(sb, "Cover", regexCover_s0, embed.Title)
 	if err != nil {
-		logger.Logger.Errorf("Failed to match for BadForAll keywords: %v", err)
+		logger.Logger.Errorf("Failed to match for Cover keywords: %v", err)
 		return redirect.Unknown, err
 	}
 
-	countC, err = countMatch(sb, "Cover", regexCover_s0, embed.Title)
+	countCPlus, err = countMatch(sb, "Cover+", regexCoverPlus, embed.Title)
 	if err != nil {
 		logger.Logger.Errorf("Failed to match for Cover keywords: %v", err)
 		return redirect.Unknown, err
@@ -558,6 +564,12 @@ func guess (task *mHandleSession, eIndex int) (redirectType redirect.RedirectTyp
 		return redirect.Unknown, err
 	}
 
+	countOPlus, err = countMatch(sb,"Original+", regexOriginalPlus, embed.Title)
+	if err != nil {
+		logger.Logger.Errorf("Failed to match for Original keywords: %v", err)
+		return redirect.Unknown, err
+	}
+
 	countNotO, err = countMatch(sb, "NotOriginal", regexBadForOriginal, embed.Title)
 	if err != nil {
 		logger.Logger.Errorf("Failed to match for NotOriginal keywords: %v", err)
@@ -579,55 +591,83 @@ func guess (task *mHandleSession, eIndex int) (redirectType redirect.RedirectTyp
 		return redirect.Unknown, err
 	}
 
+	countSPlus, err = countMatch(sb,"Stream+", regexStreamPlus, embed.Title)
+	if err != nil {
+		logger.Logger.Errorf("Failed to match for Stream keywords: %v", err)
+		return redirect.Unknown, err
+	}
+
 	countNotS, err = countMatch(sb, "NotStream", regexBadForStream, embed.Title)
 	if err != nil {
 		logger.Logger.Errorf("Failed to match for NotStream keywords: %v", err)
 		return redirect.Unknown, err
 	}
 
-	if countC + countO + countS == 0 {
-		logger.Logger.Infof("  [GUESS-%s-%d] o%d(-%d-%d) c%d(+%d-%d) s%d(-%d)", task.rId, eIndex, countO, countNotO, countDNotO, countC, countDC, countNotC, countS, countNotS)
-		return redirect.None, nil
-	} else {
-		logger.Logger.Infof("  [GUESS-%s-%d] %s", task.rId, eIndex, sb.String())
-		logger.Logger.Infof("  [GUESS-%s-%d] o%d(-%d-%d) c%d(+%d-%d) s%d(-%d)", task.rId, eIndex, countO, countNotO, countDNotO, countC, countDC, countNotC, countS, countNotS)
+	countBadForAll, err = countMatch(sb, "BadForAll", regexBadForAll, embed.Title)
+	if err != nil {
+		logger.Logger.Errorf("Failed to match for BadForAll keywords: %v", err)
+		return redirect.Unknown, err
 	}
 
+	scoreO := countO + countOPlus - countNotO - countDNotO - countBadForAll
+	scoreC := countC + countDC + countCPlus - countNotC - countBadForAll
+	scoreS := countS + countSPlus - countNotS - countBadForAll
+
+	defer func () {
+		logger.Logger.Infof("  [GUESS-%s-%d] %s", task.randomId, eIndex, sb.String())
+		logger.Logger.Infof("  [GUESS-%s-%d] %s | o%d=%d+%d-%d-%d c%d=%d+%d+%d-%d s%d=%d+%d-%d (ocs-%d)", task.randomId, eIndex,
+			redirect.RedirectTypetoString(redirectType),
+			scoreO, countO, countOPlus, countNotO, countDNotO,
+			scoreC, countC, countCPlus, countDC, countNotC,
+			scoreS, countS, countSPlus, countNotS,
+			countBadForAll,
+		)
+	} ()
+
+	if countC + countO + countS == 0 {
+		return redirect.None, nil
+	}
 
 	if countC == countO && countO == countS {
 		return redirect.Unknown, nil
 	}
 
-	countC -= (countNotC + countBadForAll)
-	countC += countDC
-	countO -= (countNotO + countBadForAll + countDNotO)
-	countS -= (countNotS + countBadForAll)
-	if countC < 0 {
-		countC = 0
+	if countC == 0 && countO == 0 && countS == 0 {
+		countDC = 0
+		countDNotO = 0
 	}
-	if countO < 0 {
-		countO = 0
+
+	if scoreC < 0 {
+		scoreC = 0
 	}
-	if countS < 0 {
-		countS = 0
+	if scoreO < 0 {
+		scoreO = 0
 	}
-	
-	if countC > countO && countC > countS {
+	if scoreS < 0 {
+		scoreS = 0
+	}
+
+	if scoreC > scoreO && scoreC > scoreS {
 		return redirect.Cover, nil
 	}
 
-	if countO > countC && countO > countS || (countO >= countC && countO > countS) {
-		if countC > 0 && countO < 3 { // If there's a keywork of Cover, it's very unlikely it'd be Original
-			return redirect.Cover, nil
-		}
-		return redirect.Original, nil
-	}
-
-	if countS > countO && countS > countC {
+	if scoreS > scoreO && scoreS > scoreC {
 		return redirect.Stream, nil
 	}
 
-	if countC > 0 && countS > 0 && countC >= countS{ // If it looks like a stream or cover, Cover is prefered (Usually, a stream is not titled with keyword of Cover)
+	if scoreO >= scoreC && scoreO > scoreS {
+		if scoreS > 0 && scoreO < 2 && scoreC < 2 {
+			return redirect.Stream, nil // It seems like people go like 'Today I'll cover XX's original songs...'
+		}
+
+		if scoreC > 0 && scoreO < 3 { // If there's a keywork of Cover, it's very unlikely it'd be Original
+			return redirect.Cover, nil
+		}
+
+		return redirect.Original, nil
+	}
+
+	if scoreC > 0 && scoreS > 0 && scoreC >= scoreS{ // If it looks like a stream or cover, Cover is prefered (Usually, a stream is not titled with keyword of Cover)
 		return redirect.Cover, nil
 	}
 
@@ -642,8 +682,8 @@ func countMatch (sb *strings.Builder, regexType string, r *regexp2.Regexp, subje
 		return count, err
 	}
 
-	count ++
-	sb.WriteString(fmt.Sprintf("    (%s) %s", regexType, m.String()))
+	count++
+	sb.WriteString(fmt.Sprintf("|   (%s) %s", regexType, m.String()))
 	for m != nil {
 		m, err = r.FindNextMatch(m)
 		if err != nil {

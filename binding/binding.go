@@ -2,6 +2,7 @@ package binding
 
 import (
 	"No3371.github.com/song_librarian.bot/logger"
+	"No3371.github.com/song_librarian.bot/memory"
 	"No3371.github.com/song_librarian.bot/redirect"
 	"No3371.github.com/song_librarian.bot/storage"
 	"github.com/vmihailenco/msgpack/v5"
@@ -9,7 +10,7 @@ import (
 
 var bindingCount int
 var allBindings map[int]*ChannelBinding // [bId]
-var mapping     map[uint64]map[int]struct{}
+var mapping     map[uint64]map[int]struct{} // Channel(s) to Binding
 var changedBindings map[int]struct{}
 var changedMappings map[uint64]struct{}
 var sp storage.StorageProvider
@@ -48,6 +49,7 @@ func (mcb *MutableChannelBinding) RemoveRedirection (r redirect.RedirectType) {
 }
 
 type ExportedChannelBinding struct {
+	memory.MemTrack
 	EnabledUrlRegexes int
 	Redirections map[redirect.RedirectType]uint64 // The index is RedirectType
 }
@@ -58,6 +60,7 @@ type ExportedChannelBinding struct {
 //    - For each RedirectType
 // 	    - What channel it redirects to
 type ChannelBinding struct {
+	memory.MemTrack
 	enabledUrlRegexes int
 	redirections map[redirect.RedirectType]uint64 // The index is RedirectType
 }
@@ -81,6 +84,7 @@ func SaveAll () (err error) {
 		b := QueryBinding(bId) // It gets loaded if it's not
 		logger.Logger.Infof("[BINDING] Saving Binding#%d", bId)
 		err = sp.SaveBinding(bId, ExportedChannelBinding {
+			MemTrack: b.MemTrack,
 			EnabledUrlRegexes: b.enabledUrlRegexes,
 			Redirections: b.redirections,
 		})
@@ -89,7 +93,7 @@ func SaveAll () (err error) {
 		}
 		delete(changedBindings, bId)
 	}
-	
+
 	for cId := range changedMappings {
 		logger.Logger.Infof("[BINDING] Saving Mapping#%d", cId)
 		err = sp.SaveChannelMapping(cId, mapping[cId])
@@ -98,7 +102,7 @@ func SaveAll () (err error) {
 		}
 		delete(changedMappings, cId)
 	}
-	
+
 	return nil
 }
 
@@ -150,7 +154,7 @@ func GetMappedBindingIDs (cId uint64) map[int]struct{} {
 			logger.Logger.Errorf("[BINDING] %v", err)
 			mapping[cId] = nil
 			return nil
-		} else if bIds == nil || len(bIds) == 0 {
+		} else if len(bIds) == 0 {
 			return nil
 		} else {
 			ids = bIds
@@ -162,21 +166,30 @@ func GetMappedBindingIDs (cId uint64) map[int]struct{} {
 
 func QueryBinding (bId int) *ChannelBinding {
 	b, exists := allBindings[bId]
-	if exists {
+	if exists { // Loaded
 		return b
-	} else {
+	} else { // Need to load or create
 		var loaded *ExportedChannelBinding = &ExportedChannelBinding{}
 		var err error
-		if err = sp.LoadBinding(bId, loaded); err != nil {
+		if err = sp.LoadBinding(bId, loaded); err != nil { // Failed to load
 			logger.Logger.Errorf("[BINDING] %v", err)
 			allBindings[bId] = nil
 			return nil
-		} else {
+		} else { // Loaded
 			b = &ChannelBinding{
+				MemTrack: loaded.MemTrack,
 				enabledUrlRegexes: loaded.EnabledUrlRegexes,
 				redirections: loaded.Redirections,
 			}
+			if b.MemTrack.SetupMemTrack (bId) {
+				changedBindings[bId] = struct{}{}
+			}
+			// if b.MemTrack == nil {
+			// 	changedBindings[bId] = struct{}{}
+			// 	b.MemTrack = *memory.NewMemTrack(bId)
+			// }
 			allBindings[bId] = b
+			logger.Logger.Infof("[BINDING] Loaded#%d", bId)
 			return b
 		}
 	}
@@ -197,6 +210,7 @@ func NewBinding () (bId int) {
 	bindingCount ++
 	bId = bindingCount
 	allBindings[bId] = &ChannelBinding{
+		MemTrack: *memory.NewMemTrack(bId),
 		redirections: make(map[redirect.RedirectType]uint64),
 	}
 	changedBindings[bId] = struct {}{}

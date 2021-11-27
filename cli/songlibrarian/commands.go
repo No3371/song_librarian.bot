@@ -109,18 +109,18 @@ func assureCommands (s *state.State) (err error) {
 			logger.Logger.Errorf("Command creation error: %v", err)
 		} else {
 			logger.Logger.Infof("DELETE command created: %d", cmdR.ID)
-			sv.SaveCommandId(int(Unsubscribe), uint64(cmdR.ID), 0)
+			sp.SaveCommandId(int(Unsubscribe), uint64(cmdR.ID), 0)
 			commandIdMap[cmdR.ID] = Unsubscribe
 		}
 	} else {
 		var savedCmdId uint64
 		var savedCmdVersion uint32
-		savedCmdId, savedCmdVersion, err = sv.LoadCommandId(int(Unsubscribe))
+		savedCmdId, savedCmdVersion, err = sp.LoadCommandId(int(Unsubscribe))
 		if err != nil {
 			logger.Logger.Errorf("Command Unsubscribe loading error: %v", err)
 		} else if savedCmdId != uint64(cmd.ID) {
 			logger.Logger.Errorf("Command ID Mismatch! Overriding with online ID!")
-			sv.SaveCommandId(int(Unsubscribe), uint64(cmd.ID), savedCmdVersion)
+			sp.SaveCommandId(int(Unsubscribe), uint64(cmd.ID), savedCmdVersion)
 			commandIdMap[discord.CommandID(savedCmdId)] = Unsubscribe
 		} else {
 			logger.Logger.Infof("Unsubscribe command loaded: %d", savedCmdId)
@@ -142,18 +142,18 @@ func assureCommands (s *state.State) (err error) {
 			logger.Logger.Errorf("Command creation error: %v", err)
 		} else {
 			logger.Logger.Infof("DELETE command created: %d", cmdR.ID)
-			sv.SaveCommandId(int(Resubscribe), uint64(cmdR.ID), 0)
+			sp.SaveCommandId(int(Resubscribe), uint64(cmdR.ID), 0)
 			commandIdMap[cmdR.ID] = Resubscribe
 		}
 	} else {
 		var savedCmdId uint64
 		var savedCmdVersion uint32
-		savedCmdId, savedCmdVersion, err = sv.LoadCommandId(int(Resubscribe))
+		savedCmdId, savedCmdVersion, err = sp.LoadCommandId(int(Resubscribe))
 		if err != nil {
 			logger.Logger.Errorf("Command Resubscribe loading error: %v", err)
 		} else if savedCmdId != uint64(cmd.ID) {
 			logger.Logger.Errorf("Command ID Mismatch! Overriding with online ID!")
-			sv.SaveCommandId(int(Resubscribe), uint64(cmd.ID), savedCmdVersion)
+			sp.SaveCommandId(int(Resubscribe), uint64(cmd.ID), savedCmdVersion)
 			commandIdMap[discord.CommandID(savedCmdId)] = Resubscribe
 		} else {
 			logger.Logger.Infof("Resubscribe command loaded: %d", savedCmdId)
@@ -212,18 +212,18 @@ func assureCommands (s *state.State) (err error) {
 			logger.Logger.Errorf("Command creation error: %v", err)
 		} else {
 			logger.Logger.Infof("DELETE command created: %d", cmdR.ID)
-			sv.SaveCommandId(int(DeleteRedirectedMessage), uint64(cmdR.ID), 0)
+			sp.SaveCommandId(int(DeleteRedirectedMessage), uint64(cmdR.ID), 0)
 			commandIdMap[cmdR.ID] = DeleteRedirectedMessage
 		}
 	} else {
 		var savedCmdId uint64
 		var savedCmdVersion uint32
-		savedCmdId, savedCmdVersion, err = sv.LoadCommandId(int(DeleteRedirectedMessage))
+		savedCmdId, savedCmdVersion, err = sp.LoadCommandId(int(DeleteRedirectedMessage))
 		if err != nil {
 			logger.Logger.Errorf("Command DeleteRedirectedMessage loading error: %v", err)
 		} else if savedCmdId != uint64(cmd.ID) {
 			logger.Logger.Errorf("Command ID Mismatch! Overriding with online ID!")
-			sv.SaveCommandId(int(DeleteRedirectedMessage), uint64(cmd.ID), savedCmdVersion)
+			sp.SaveCommandId(int(DeleteRedirectedMessage), uint64(cmd.ID), savedCmdVersion)
 			commandIdMap[discord.CommandID(savedCmdId)] = DeleteRedirectedMessage
 		} else {
 			logger.Logger.Infof("DeleteRedirectedMessage command loaded: %d", savedCmdId)

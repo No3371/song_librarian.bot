@@ -12,20 +12,20 @@ func init () {
 
 func unsub (u discord.UserID) (err error) {
 	subscribingStates[u] = false
-	return sv.SaveSubState(uint64(u), false)
+	return sp.SaveSubState(uint64(u), false)
 }
 
 func resub (u discord.UserID) (err error) {
 	if _, loaded := subscribingStates[u]; !loaded {
-		subscribingStates[u], err = sv.LoadSubState(uint64(u))
+		subscribingStates[u], err = sp.LoadSubState(uint64(u))
 	}
 	subscribingStates[u] = true
-	return sv.SaveSubState(uint64(u), true)
+	return sp.SaveSubState(uint64(u), true)
 }
 
 func getSubState (u discord.UserID) (sub bool, err error) {
 	if s, tracked := subscribingStates[u]; !tracked {
-		s, err = sv.LoadSubState(uint64(u))
+		s, err = sp.LoadSubState(uint64(u))
 		if err != nil {
 			return true, err
 		}
