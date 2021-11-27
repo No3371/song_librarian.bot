@@ -718,7 +718,7 @@ func (s *sqlite) SaveMem(tId int, slot int, data string) (err error) {
 	ON CONFLICT(TRACK,SLOT) DO UPDATE SET
 		TS = excluded.TS,
 		JSON = excluded.JSON;
-	`, tId, slot, time.Now().UnixMilli(), data)
+	`, tId, slot, time.Now().UnixNano() / 1000000, data)
 
 	if s.PRINTSTMT {
 		logger.Logger.Info(stmt)
