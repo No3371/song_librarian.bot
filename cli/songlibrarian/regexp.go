@@ -37,4 +37,4 @@ var regexNamedStream = regexp2.MustCompile(`【YouTube Live】波羅ノ鬼 - Har
 
 var regexMention = regexp2.MustCompile(`^<@!(\d+)>`, regexp2.IgnoreCase | regexp2.Multiline)
 
-var regexLinks = regexp2.MustCompile(`http|\.com|www\.|:\/\/`, regexp2.IgnoreCase | regexp2.Multiline)
+var regexLinks = regexp2.MustCompile(`http(?!.+?discord\.com\/channels)`, regexp2.IgnoreCase | regexp2.Multiline)
