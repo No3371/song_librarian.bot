@@ -27,6 +27,7 @@ func init () {
 }
 
 type mHandleSession struct {
+	notUnlinked bool
 	randomId string
 	bindingId int
 	cId discord.ChannelID
@@ -75,6 +76,7 @@ func addEventHandlers (s *state.State) (err error){
 			randomId: getRandomID(3),
 			cId: e.Message.ChannelID,
 			mId: e.Message.ID,
+			msg: &e.Message,
 		}
 	})
 
@@ -87,17 +89,29 @@ func handlerLoop (s *state.State) {
 	for {
 		item := <-buffer
 		atomic.AddUint64(&statSession.MessageBuffered, 1)
-		item.msg, err = s.Message(item.cId, item.mId)
-		if item.msg == nil || err != nil {
-			logger.Logger.Infof("[HANDLER] [%s] Buffered item invalid. error? %v", item.randomId, err)
-			continue
+		
+		if match, err := regexLinks.MatchString(item.msg.Content); err != nil {
+			logger.Logger.Errorf("Failed to pre-filter: %v", err)
+			item.notUnlinked = true
+		} else {
+			item.notUnlinked = match
 		}
 
-		if len(item.msg.Embeds) == 0 {
-			atomic.AddUint64(&statSession.FirstFetchEmbeds0, 1)
+		if item.notUnlinked {
+			item.msg, err = s.Message(item.cId, item.mId)
+			if item.msg == nil || err != nil {
+				logger.Logger.Infof("[HANDLER] [%s] Buffered item invalid. error? %v", item.randomId, err)
+				continue
+			}
+			if len(item.msg.Embeds) == 0 {
+				atomic.AddUint64(&statSession.FirstFetchEmbeds0, 1)
+			}
+		} else {
+			atomic.AddUint64(&statSession.Unlinked, 1)
 		}
 
-		if time.Since(item.msg.Timestamp.Time().Local()) < time.Second*2 {
+
+		if item.notUnlinked && len(item.msg.Embeds) == 0 {
 			<-fetchDelayTimer.C
 			fetchDelayTimer.Reset(time.Second * 3)
 			item.msg, err = s.Message(item.cId, item.mId)
@@ -137,7 +151,7 @@ func onMessageCreated (s *state.State, task *mHandleSession) (err error) {
 				continue
 			}
 
-			if len(task.msg.Embeds) == 0 {
+			if task.notUnlinked && len(task.msg.Embeds) == 0 {
 				<-fetchDelayTimer.C
 				fetchDelayTimer.Reset(time.Second * 3)
 				task.msg, err = s.Message(task.msg.ChannelID, task.msg.ID)

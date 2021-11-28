@@ -36,3 +36,5 @@ var regexNamedCover = regexp2.MustCompile(`ver.EMA`, regexp2.IgnoreCase | regexp
 var regexNamedStream = regexp2.MustCompile(`【YouTube Live】波羅ノ鬼 - Harano oni|響歌シノのヒビカセ`, regexp2.IgnoreCase | regexp2.Multiline)
 
 var regexMention = regexp2.MustCompile(`^<@!(\d+)>`, regexp2.IgnoreCase | regexp2.Multiline)
+
+var regexLinks = regexp2.MustCompile(`http|\.com|www\.|:\/\/`, regexp2.IgnoreCase | regexp2.Multiline)
