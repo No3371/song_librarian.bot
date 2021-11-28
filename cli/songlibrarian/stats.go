@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"strings"
 	"time"
 
@@ -40,12 +41,12 @@ func (s *stats) Print() {
 	passed := time.Since(statSession.StartAt).Round(time.Second)
 	sb := &strings.Builder{}
 	sb.WriteString(fmt.Sprintf("\nUptime: %s", passed))
-	sb.WriteString(fmt.Sprintf("\nAverage msg/hour: %d", statSession.BoundChannelMessage/uint64(passed.Hours())))
-	sb.WriteString(fmt.Sprintf("\nAverage msg/hour: %d", statSession.BoundChannelMessage/uint64(passed.Hours())))
-	sb.WriteString(fmt.Sprintf("\nGuess correctness: %0.2f%%\n%s\n", 100*(float64(statSession.GuessRight)/float64(statSession.Pended))))
-	sb.WriteString(fmt.Sprintf("\nGuess wrongness: %0.2f%%\n%s\n", 100*(float64(statSession.GueseWrongType)/float64(statSession.Pended))))
+	sb.WriteString(fmt.Sprintf("\nAverage msg/hour: %0.2f", float64(statSession.BoundChannelMessage) / math.Max(1, passed.Hours())))
+	sb.WriteString(fmt.Sprintf("\nAverage msg/hour: %0.2f", float64(statSession.BoundChannelMessage) / math.Max(1, passed.Hours())))
+	sb.WriteString(fmt.Sprintf("\nGuess correctness: %0.2f%%", 100*(float64(statSession.GuessRight)/float64(statSession.Pended))))
+	sb.WriteString(fmt.Sprintf("\nGuess wrongness: %0.2f%%", 100*(float64(statSession.GueseWrongType)/float64(statSession.Pended))))
 	sb.WriteString(string(j))
-	fmt.Printf(sb.String())
+	fmt.Print(sb.String())
 }
 
 type badGuessRecord struct {
