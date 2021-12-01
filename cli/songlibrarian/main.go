@@ -262,7 +262,7 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 					err2 := s.DeleteMessage(botMsg.ChannelID, botMsg.ID, "Temporary bot message")
 					if err2 != nil {
 						// Failed to remove the bot message...?
-						logger.Logger.Errorf("Failed to remove the bot message: %d", err2)
+						logger.Logger.Errorf("Failed to remove the bot message: %v", err2)
 					} else {
 						botMsg = nil
 					}
@@ -283,9 +283,6 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 				<-t.C
 				botMsg, originalMsg, err = validate(s, p)
 				if botMsg == nil || originalMsg == nil {
-					if err != nil {
-						logger.Logger.Errorf("Failed to validate: %v", err)
-					}
 					break // Do not cancel here, we still have one more chance down there (Somehow sometimes Discord randomly return 404 for message?)
 				}
 			}
@@ -293,9 +290,6 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 			// Do it again because passed < delay may not always be true
 			botMsg, originalMsg, err = validate(s, p)
 			if botMsg == nil || originalMsg == nil {
-				if err != nil {
-					logger.Logger.Errorf("Failed to validate: %v", err)
-				}
 				if originalMsg != nil {
 					err = _binding.Memorize(originalMsg.Embeds[p.embedIndex].URL, memory.CancelledWithError)
 					if err != nil {
