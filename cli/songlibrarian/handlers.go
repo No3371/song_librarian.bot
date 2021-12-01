@@ -208,9 +208,11 @@ func onMessageCreated (s *state.State, task *mHandleSession) (err error) {
 				}
 			}
 	
-			// Find all bindings bound
-			// For each binding, for each redirection, if the regex match...
-			if task.notUnlinked {
+			if notSkipLinks, err := regexNotSkipLinks.MatchString(task.msg.Content); err != nil {
+				logger.Logger.Errorf("Failed to check skip link: %v", err)
+			} else if notSkipLinks {
+				// Find all bindings bound
+				// For each binding, for each redirection, if the regex match...
 				for ei, e := range task.msg.Embeds {
 					logger.Logger.Infof("💬 %s-%d / %s (%s)", task.randomId, ei, e.Title, e.URL)
 					atomic.AddUint64(&statSession.AnalyzedEmbeds, 1)
@@ -230,6 +232,8 @@ func onMessageCreated (s *state.State, task *mHandleSession) (err error) {
 						}
 					}
 				}
+			} else if task.notUnlinked {
+				atomic.AddUint64(&statSession.SkippedLinks, 1)
 			}
 		}
 	}

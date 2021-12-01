@@ -16,6 +16,7 @@ type stats struct {
 	UnSubbedSkips       uint64
 	MessageBuffered     uint64
 	Unlinked            uint64
+	SkippedLinks        uint64
 	FirstFetchEmbeds0   uint64
 	SecondFetchEmbeds0  uint64
 	ThirdFetchEmbeds0   uint64
