@@ -42,6 +42,7 @@ type MemTrack struct {
     Mapping map[string]int
     List []*Memory
     MemPointer int
+    LastTouchedMemPointer int
     lock *sync.RWMutex
 }
 
@@ -56,6 +57,7 @@ func NewMemTrack (tId int) *MemTrack {
         Mapping: make(map[string]int),
         List: make([]*Memory, MEM_SIZE),
         MemPointer: 0,
+		LastTouchedMemPointer: 0,
 		lock: &sync.RWMutex{},
     }
 }
@@ -78,8 +80,8 @@ func (mt *MemTrack) SetupMemTrack (tId int) (updated bool) {
 	if latest, err := sp.GetLatestMemIndex(mt.TId); err != nil {
 		logger.Logger.Errorf("Failed to read latest index of memtrack#%d: %v", mt.TId, err)
 	} else {
-		logger.Logger.Infof("Memtrack#%d: latest mem slot is %d, pointer is %d", tId, latest, mt.MemPointer)
-		if (latest != mt.MemPointer - 1) {
+		logger.Logger.Infof("Memtrack#%d: latest mem slot is %d, pointer is %d", tId, latest, mt.LastTouchedMemPointer)
+		if (latest != mt.LastTouchedMemPointer - 1) {
 			logger.Logger.Infof("Memtrack#%d: Found inconsistency between cached MemPointer and latest memory record, fixing...", mt.TId)
 			mt.Mapping = make(map[string]int)
 			mt.List = make([]*Memory, MEM_SIZE)
@@ -93,7 +95,7 @@ func (mt *MemTrack) SetupMemTrack (tId int) (updated bool) {
 				updated = true
 				return nil
 			})
-			mt.MemPointer = latest + 1
+			mt.LastTouchedMemPointer = latest + 1
 			if err != nil {
 				logger.Logger.Errorf(" Failed to fix the memtrack: %v", err)
 			}
@@ -311,6 +313,8 @@ func (mt *MemTrack) Memorize (url string, state memState) (err error) {
 		logger.Logger.Errorf("Failed to save mem%d-%d: %s", mt.TId, mIndex, err)
 		return err
 	}
+
+	mt.LastTouchedMemPointer = mIndex
 
 	return nil
 }
