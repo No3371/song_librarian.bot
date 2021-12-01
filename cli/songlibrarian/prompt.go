@@ -138,8 +138,7 @@ func bind () (bId int, err error) {
 	if err != nil {
 		return 0, err
 	}
-	
-	enteringBId:
+
 	input := prompt.Input("binding ID, or 'new': ", noopCompleter)
 	
 	if input == "cancel" {
@@ -163,20 +162,7 @@ func bind () (bId int, err error) {
 		binding.Bind(cId, bId)
 	} else {
 		bId, err = strconv.Atoi(input)
-		fmt.Printf("Getting binding#%d\n", bId)
-		b := binding.GetModifiableBinding(bId)	
-		if b == nil {
-			fmt.Printf("Binding#%d does not exist.\n", bId)
-			goto enteringBId
-		}
-		logger.Logger.Infof("%+v", b.ChannelBinding)	
-		r, rcId, err := newRedirection()
-		if err != nil {
-			return 0, err
-		}		
-		b.SetRedirection(r, rcId)	
 		binding.Bind(cId, bId)
-		logger.Logger.Infof("%+v", b.ChannelBinding)	
 	}
 	
 	binding.SaveAll()
