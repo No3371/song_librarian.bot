@@ -248,11 +248,23 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 
 		processRedirect := func (p *pendingEmbed) (err error){
 
+			var botMsg *discord.Message
+			var originalMsg *discord.Message
+
 			defer func () {
 				if err == nil {
 					if pErr := recover(); pErr != nil {
 						logger.Logger.Errorf("TARCING PANIC:\n", debug.Stack())
 						err = fmt.Errorf("PANIC: %v", pErr)
+					}
+				}
+				if botMsg != nil {
+					err2 := s.DeleteMessage(botMsg.ChannelID, botMsg.ID, "Temporary bot message")
+					if err2 != nil {
+						// Failed to remove the bot message...?
+						logger.Logger.Errorf("Failed to remove the bot message: %d", err2)
+					} else {
+						botMsg = nil
 					}
 				}
 			} ()
@@ -262,9 +274,6 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 			if _binding == nil {
 				panic("nil binding")
 			}
-			var botMsg *discord.Message
-			var originalMsg *discord.Message
-
 			if p == nil {
 				panic("nil pended?")
 			}
@@ -299,11 +308,11 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 			lastRedirectTime := _binding.GetLastTime(originalMsg.Embeds[p.embedIndex].URL, memory.Redirected)
 			if time.Since(lastRedirectTime) < time.Minute { // Handles user racing
 				logger.Logger.Infof("  [%s-%d] Seems like it just got redirected, abort.", p.taskId, p.embedIndex)
-				err = s.DeleteMessage(botMsg.ChannelID, botMsg.ID, "Temporary bot message")
-				if err != nil {
-					// Failed to remove the bot message...?
-					logger.Logger.Errorf("Failed to remove the bot message: %d", err)
-				}
+				// err = s.DeleteMessage(botMsg.ChannelID, botMsg.ID, "Temporary bot message")
+				// if err != nil {
+				// 	// Failed to remove the bot message...?
+				// 	logger.Logger.Errorf("Failed to remove the bot message: %d", err)
+				// }
 				return
 			}
 
@@ -328,11 +337,11 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 				if p.autoType == redirect.None {
 					atomic.AddUint64(&statSession.GuessRight, 1)
 				}
-				err = s.DeleteMessage(botMsg.ChannelID, botMsg.ID, "Temporary bot message")
-				if err != nil {
-					// Failed to remove the bot message...?
-					logger.Logger.Errorf("Failed to remove the bot message: %v", err)
-				}
+				// err = s.DeleteMessage(botMsg.ChannelID, botMsg.ID, "Temporary bot message")
+				// if err != nil {
+				// 	// Failed to remove the bot message...?
+				// 	logger.Logger.Errorf("Failed to remove the bot message: %v", err)
+				// }
 				err = _binding.Memorize(originalMsg.Embeds[p.embedIndex].URL, memory.Cancelled)
 				if err != nil {
 					logger.Logger.Errorf("[%s-%d] Failed to memorize.", p.taskId, p.embedIndex)
@@ -347,11 +356,11 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 			destCId, bound := binding.QueryBinding(p.bindingId).DestChannelId(finalType)
 			if !bound {
 				logger.Logger.Infof("[MAIN] No destination bound to %v", finalType)
-				err = s.DeleteMessage(botMsg.ChannelID, botMsg.ID, "Temporary bot message")
-				if err != nil {
-					// Failed to remove the bot message...?
-					logger.Logger.Errorf("Failed to remove the bot message: %d", err)
-				}
+				// err = s.DeleteMessage(botMsg.ChannelID, botMsg.ID, "Temporary bot message")
+				// if err != nil {
+				// 	// Failed to remove the bot message...?
+				// 	logger.Logger.Errorf("Failed to remove the bot message: %d", err)
+				// }
 				if originalMsg != nil {
 					err = _binding.Memorize(originalMsg.Embeds[p.embedIndex].URL, memory.CancelledWithError)
 					if err != nil {
@@ -425,34 +434,33 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 			)
 	
 			if err != nil {
-				logger.Logger.Errorf("F1: %s", err)
+				logger.Logger.Errorf("Failed to send message1: %s", err)
+				rm, err = s.SendMessageComplex(
+					discord.ChannelID(destCId), *data,
+				)
 			}
 	
 			_, err = s.SendMessage(discord.ChannelID(destCId), fmt.Sprintf("%s %s", originalMsg.Embeds[p.embedIndex].URL, locale.EXPLAIN_EMBED_RESOLVE))
 			if err != nil {
-				logger.Logger.Errorf("F2: %s", err)
+				logger.Logger.Errorf("Failed to send message2: %s", err)
 			}
 
-			if communityVotes > 3 {	
-				_, err = s.SendMessage(discord.ChannelID(destCId), locale.HOT)
-				if err != nil {
-					logger.Logger.Errorf("F3: %s", err)
-				}
-			}
+			// if communityVotes > 3 {	
+			// 	_, err = s.SendMessage(discord.ChannelID(destCId), locale.HOT)
+			// 	if err != nil {
+			// 		logger.Logger.Errorf("Failed to send message3: %s", err)
+			// 	}
+			// }
 
 			err = _binding.Memorize(originalMsg.Embeds[p.embedIndex].URL, memory.Redirected)
 			if err != nil {
 				logger.Logger.Errorf("  [%s-%d] Failed to memorize.", p.taskId, p.embedIndex)
 			}
 
-			logger.Logger.Infof("  [%s-%d] Redirected     c%d - m%d", p.taskId, p.embedIndex, destCId, rm.ID)	
-			atomic.AddUint64(&statSession.Redirected, 1)
-
-			err = s.DeleteMessage(botMsg.ChannelID, botMsg.ID, "Temporary bot message")
-			if err != nil {
-				// Failed to remove the bot message...?
-				logger.Logger.Errorf("Failed to remove the bot message: %d", err)
+			if rm != nil {
+				logger.Logger.Infof("  [%s-%d] Redirected     c%d - m%d", p.taskId, p.embedIndex, destCId, rm.ID)	
 			}
+			atomic.AddUint64(&statSession.Redirected, 1)
 	
 			return nil
 		}
