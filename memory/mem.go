@@ -81,7 +81,7 @@ func (mt *MemTrack) SetupMemTrack (tId int) (updated bool) {
 		logger.Logger.Errorf("Failed to read latest index of memtrack#%d: %v", mt.TId, err)
 	} else {
 		logger.Logger.Infof("Memtrack#%d: latest mem slot is %d, pointer is %d", tId, latest, mt.LastTouchedMemPointer)
-		if (latest != mt.LastTouchedMemPointer - 1) {
+		if (latest != mt.LastTouchedMemPointer) {
 			logger.Logger.Infof("Memtrack#%d: Found inconsistency between cached MemPointer and latest memory record, fixing...", mt.TId)
 			mt.Mapping = make(map[string]int)
 			mt.List = make([]*Memory, MEM_SIZE)
