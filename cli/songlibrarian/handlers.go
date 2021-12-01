@@ -210,21 +210,23 @@ func onMessageCreated (s *state.State, task *mHandleSession) (err error) {
 	
 			// Find all bindings bound
 			// For each binding, for each redirection, if the regex match...
-			for ei, e := range task.msg.Embeds {
-				logger.Logger.Infof("💬 %s-%d / %s (%s)", task.randomId, ei, e.Title, e.URL)
-				atomic.AddUint64(&statSession.AnalyzedEmbeds, 1)
-				urlMatching: for i := 0; i < urlRegexCount; i++ {
-					if b.UrlRegexEnabled(i) {
-						if isMatch, _ := regexUrlMapping[i].MatchString(e.URL); isMatch {
-							atomic.AddUint64(&statSession.UrlRegexMatched, 1)
-							task.bindingId = bId
-							if err := pendEmbed(s, task, ei, bId); err != nil {
-								logger.Logger.Errorf("%s", err)
-								continue
-							} else {
-								atomic.AddUint64(&statSession.Pended, 1)
+			if task.notUnlinked {
+				for ei, e := range task.msg.Embeds {
+					logger.Logger.Infof("💬 %s-%d / %s (%s)", task.randomId, ei, e.Title, e.URL)
+					atomic.AddUint64(&statSession.AnalyzedEmbeds, 1)
+					urlMatching: for i := 0; i < urlRegexCount; i++ {
+						if b.UrlRegexEnabled(i) {
+							if isMatch, _ := regexUrlMapping[i].MatchString(e.URL); isMatch {
+								atomic.AddUint64(&statSession.UrlRegexMatched, 1)
+								task.bindingId = bId
+								if err := pendEmbed(s, task, ei, bId); err != nil {
+									logger.Logger.Errorf("%s", err)
+									continue
+								} else {
+									atomic.AddUint64(&statSession.Pended, 1)
+								}
+								break urlMatching
 							}
-							break urlMatching
 						}
 					}
 				}

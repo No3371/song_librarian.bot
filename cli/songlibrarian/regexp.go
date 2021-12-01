@@ -8,7 +8,7 @@ var regexUrlMapping = []*regexp2.Regexp{
 	regexYoutubeUrl_u0,
 }
 
-var regexYoutubeUrl_u0 = regexp2.MustCompile(`^((?:https?:)?\/\/)?((?:www|m)\.)?((?:youtube\.com|youtu.be))(\/(?:[\w\-]+\?v=|embed\/|v\/)?)(?!c|post|playlist)([\w\-]+)(\S+)?$`, 0)
+var regexYoutubeUrl_u0 = regexp2.MustCompile(`((?:https?:)\/\/)((?:www|m)\.)?((?:youtube\.com|youtu.be))(\/(?:[\w\-]+\?v=|embed\/|v\/)?)(?!c|post|playlist)([\w\-]+)(\S+)?$`, regexp2.Multiline)
 
 var regexCoverPlus = regexp2.MustCompile(`【\s?(cover|𝑐𝑜𝑣𝑒𝑟|歌いました|歌ってみた|翻唱)\s?】`, regexp2.IgnoreCase | regexp2.Multiline)
 var regexOriginalPlus = regexp2.MustCompile(`【\s?(original|原創|オリジナル)\s?】`, regexp2.IgnoreCase | regexp2.Multiline)
@@ -38,4 +38,4 @@ var regexNamedStream = regexp2.MustCompile(`【YouTube Live】波羅ノ鬼 - Har
 
 var regexMention = regexp2.MustCompile(`^<@!(\d+)>`, regexp2.IgnoreCase | regexp2.Multiline)
 
-var regexLinks = regexp2.MustCompile(`http(?!.+?discord\.com\/channels)`, regexp2.IgnoreCase | regexp2.Multiline)
+var regexLinks = regexp2.MustCompile(`(?<!\.)http(?!.+?discord\.com\/channels)`, regexp2.IgnoreCase | regexp2.Multiline)
