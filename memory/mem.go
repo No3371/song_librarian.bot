@@ -24,7 +24,7 @@ const (
 	CancelledWithError
 )
 
-const MEM_SIZE = 2048
+var MEM_SIZE = 4096
 
 type Memory struct {
 	Url string
@@ -45,8 +45,9 @@ type MemTrack struct {
     lock *sync.RWMutex
 }
 
-func Setup (_sp storage.StorageProvider) {
+func Setup (_sp storage.StorageProvider, memSize int) {
 	sp = _sp
+	MEM_SIZE = memSize
 }
 
 func NewMemTrack (tId int) *MemTrack {

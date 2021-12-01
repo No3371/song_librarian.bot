@@ -15,6 +15,7 @@ type flags struct {
 	delay *time.Duration
 	controlPort *uint16
 	cooldown *time.Duration
+	memsize *int
 	printSqlStmt *bool
 }
 
@@ -32,7 +33,8 @@ func resolveFlags () {
 	globalFlags.locale = flag.String("locale", "TW", "locale code")
 	globalFlags.delay = flag.Duration("delay", time.Minute, "")
 	globalFlags.controlPort = flag.Uint16("cport", 11813, "")
-	globalFlags.cooldown = flag.Duration("cooldown", time.Hour * 24 * 7, "")
+	globalFlags.cooldown = flag.Duration("cooldown", time.Hour * 24 * 31, "")
+	globalFlags.memsize = flag.Int("memsize", 4096, "")
 
 	flag.Parse()
 }

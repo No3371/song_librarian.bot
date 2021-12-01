@@ -132,7 +132,7 @@ func session (sCloser chan struct{}) (err error) {
 	}
 
 	binding.Setup(sp)
-	memory.Setup(sp)
+	memory.Setup(sp, *globalFlags.memsize)
 
 	s, err := state.New("Bot " + *globalFlags.token)
 	if err != nil {
