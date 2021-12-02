@@ -45,7 +45,7 @@ func (s *stats) Print() {
 	sb.WriteString(fmt.Sprintf("\nAverage msg/hour: %0.2f", float64(statSession.BoundChannelMessage) / math.Max(1, passed.Hours())))
 	sb.WriteString(fmt.Sprintf("\nAverage msg/hour: %0.2f", float64(statSession.BoundChannelMessage) / math.Max(1, passed.Hours())))
 	sb.WriteString(fmt.Sprintf("\nGuess correctness: %0.2f%%", 100*(float64(statSession.GuessRight)/float64(statSession.Pended))))
-	sb.WriteString(fmt.Sprintf("\nGuess wrongness: %0.2f%%", 100*(float64(statSession.GueseWrongType)/float64(statSession.Pended))))
+	sb.WriteString(fmt.Sprintf("\nGuess wrongness: %0.2f%%\n", 100*(float64(statSession.GueseWrongType)/float64(statSession.Pended))))
 	sb.WriteString(string(j))
 	fmt.Print(sb.String())
 }

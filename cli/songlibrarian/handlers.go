@@ -644,7 +644,7 @@ func guess (task *mHandleSession, eIndex int) (redirectType redirect.RedirectTyp
 		)
 	} ()
 
-	if countC + countO + countS == 0 {
+	if scoreO + scoreC + scoreS <= 0 {
 		return redirect.None, nil
 	}
 
