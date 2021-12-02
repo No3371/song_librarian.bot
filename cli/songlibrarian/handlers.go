@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"math"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -630,8 +631,17 @@ func guess (task *mHandleSession, eIndex int) (redirectType redirect.RedirectTyp
 	}
 
 	scoreO := countO + countOPlus - countNotO - countDNotO - countBadForAll
+	if scoreO < 0 {
+		scoreO = 0
+	}
 	scoreC := countC + countDC + countCPlus - countNotC - countBadForAll
+	if scoreC < 0 {
+		scoreC = 0
+	}
 	scoreS := countS + countSPlus - countNotS - countBadForAll
+	if scoreS < 0 {
+		scoreS = 0
+	}
 
 	defer func () {
 		logger.Logger.Infof("  [GUESS-%s-%d] %s", task.randomId, eIndex, sb.String())
