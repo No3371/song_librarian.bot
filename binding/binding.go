@@ -80,8 +80,8 @@ func Serialize (b *ChannelBinding) (bytes []byte, err error) {
 }
 
 func SaveAll () (err error) {
-	for bId := range changedBindings {
-		b := QueryBinding(bId) // It gets loaded if it's not
+	for bId := range allBindings { // Only loaded ones get saved
+		b := QueryBinding(bId)
 		logger.Logger.Infof("[BINDING] Saving Binding#%d", bId)
 		err = sp.SaveBinding(bId, ExportedChannelBinding {
 			MemTrack: b.MemTrack,
