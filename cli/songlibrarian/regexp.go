@@ -23,9 +23,9 @@ var regexClips = regexp2.MustCompile(`(?<!video)clip|切り抜き|translat(e|ion
 
 
 var regexBadForOriginal = regexp2.MustCompile(`cover|てみた|(original:|オリジナル)\s?mv.+(てみた|cover)|(てみた|cover).+original:|オリジナル\s?mv|公開|full.ver|(?!^)official髭男dism`, regexp2.IgnoreCase | regexp2.Multiline)
-var regexBadForCover = regexp2.MustCompile(`live|singing stream|歌枠`, regexp2.IgnoreCase | regexp2.Multiline)
+var regexBadForCover = regexp2.MustCompile(`live(?!\s?video)|singing stream|歌枠`, regexp2.IgnoreCase | regexp2.Multiline)
 var regexBadForStream = regexp2.MustCompile(`debut|birthday stream|reaction`, regexp2.IgnoreCase | regexp2.Multiline)
-var regexBadForAll = regexp2.MustCompile(`REMIX枠|【(雑談|作業)】|迷因|trailer|XFD`, regexp2.IgnoreCase | regexp2.Multiline)
+var regexBadForAll = regexp2.MustCompile(`REMIX枠|【(雑談|作業|apex|asmr)】|迷因|trailer|XFD|`, regexp2.IgnoreCase | regexp2.Multiline)
 
 var regexCoverDesc = regexp2.MustCompile(`(本家|原唱|original:)([^\n\r]{1,4}\n?)http[^\n\r]+?(?![^\n\r]+?配信)[^\n\r]+?$|(本家|original:|原唱)([^\n\r]{1,4}\n?)http[^\n\r]+?(?![^\n\r]+?配信)[^\n\r]+?$|#歌ってみた`, regexp2.IgnoreCase | regexp2.Multiline)
 // var regexOriginalDesc = regexp2.MustCompile(`buy[^\n\r]{1,8}\n?http.+?$`, regexp2.IgnoreCase | regexp2.Multiline)
