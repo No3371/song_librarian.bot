@@ -3,7 +3,6 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"math"
 	"strings"
 	"sync/atomic"
 	"time"
