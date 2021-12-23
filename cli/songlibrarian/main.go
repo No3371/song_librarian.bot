@@ -258,6 +258,7 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 						err = fmt.Errorf("PANIC: %v", pErr)
 					}
 				}
+
 				if botMsg != nil {
 					err2 := s.DeleteMessage(botMsg.ChannelID, botMsg.ID, "Temporary bot message")
 					if err2 != nil {
@@ -281,6 +282,9 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 			for time.Now().Before(p.estimatedRTime.Add(time.Second * 2)) {
 				t.Reset(time.Second * 16)
 				<-t.C
+				if *globalFlags.novote {
+					break
+				}
 				botMsg, originalMsg, err = validate(s, p)
 				if botMsg == nil || originalMsg == nil {
 					break // Do not cancel here, we still have one more chance down there (Somehow sometimes Discord randomly return 404 for message?)
@@ -296,7 +300,9 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 						logger.Logger.Errorf("[%s-%d] Failed to memorize.", p.taskId, p.embedIndex)
 					}
 				}
-				return
+				if !*globalFlags.novote {
+					return
+				}
 			}
 
 			lastRedirectTime := _binding.GetLastTime(originalMsg.Embeds[p.embedIndex].URL, memory.Redirected)
@@ -327,26 +333,6 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 				})
 			}
 
-			if finalType == redirect.None {
-				if p.autoType == redirect.None {
-					atomic.AddUint64(&statSession.GuessRight, 1)
-				}
-				// err = s.DeleteMessage(botMsg.ChannelID, botMsg.ID, "Temporary bot message")
-				// if err != nil {
-				// 	// Failed to remove the bot message...?
-				// 	logger.Logger.Errorf("Failed to remove the bot message: %v", err)
-				// }
-				err = _binding.Memorize(originalMsg.Embeds[p.embedIndex].URL, memory.Cancelled)
-				if err != nil {
-					logger.Logger.Errorf("[%s-%d] Failed to memorize.", p.taskId, p.embedIndex)
-				}
-				return
-			}
-
-			if p.autoType != finalType { // finalType is not None
-				atomic.AddUint64(&statSession.GueseWrongType, 1)
-			}
-	
 			destCId, bound := binding.QueryBinding(p.bindingId).DestChannelId(finalType)
 			if !bound {
 				logger.Logger.Infof("[MAIN] No destination bound to %v", finalType)
@@ -362,6 +348,44 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 					}
 				}
 				return
+			}
+
+			if finalType == redirect.None {
+				if p.autoType == redirect.None {
+					atomic.AddUint64(&statSession.GuessRight, 1)
+				}
+				// err = s.DeleteMessage(botMsg.ChannelID, botMsg.ID, "Temporary bot message")
+				// if err != nil {
+				// 	// Failed to remove the bot message...?
+				// 	logger.Logger.Errorf("Failed to remove the bot message: %v", err)
+				// }
+				if *globalFlags.redirNone {
+					var rm *discord.Message
+					rm, err = send(s, destCId, p, originalMsg, _binding, result)
+					if err != nil {
+						return
+					}
+		
+					err = _binding.Memorize(originalMsg.Embeds[p.embedIndex].URL, memory.Redirected)
+					if err != nil {
+						logger.Logger.Errorf("  [%s-%d] Failed to memorize.", p.taskId, p.embedIndex)
+					}
+		
+					if rm != nil {
+						logger.Logger.Infof("  [%s-%d] Redirected     c%d - m%d", p.taskId, p.embedIndex, destCId, rm.ID)	
+					}
+					atomic.AddUint64(&statSession.Redirected, 1)
+					return
+				}
+				err = _binding.Memorize(originalMsg.Embeds[p.embedIndex].URL, memory.Cancelled)
+				if err != nil {
+					logger.Logger.Errorf("[%s-%d] Failed to memorize.", p.taskId, p.embedIndex)
+				}
+				return
+			}
+
+			if p.autoType != finalType { // finalType is not None
+				atomic.AddUint64(&statSession.GueseWrongType, 1)
 			}
 
 			if communityVotes == 0 { // No one voted
@@ -408,43 +432,12 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 					}
 				}
 			}
-
-			var data *api.SendMessageData
-			data, err = prepareRedirectionMessage(originalMsg, p, result)
-			if err != nil {
-				logger.Logger.Errorf("Failed to prepare redirection message!\n%v", err)
-				if originalMsg != nil {
-					err = _binding.Memorize(originalMsg.Embeds[p.embedIndex].URL, memory.CancelledWithError)
-					if err != nil {
-						logger.Logger.Errorf("[%s-%d] Failed to memorize.", p.taskId, p.embedIndex)
-					}
-				}
-				return
-			}
 	
 			var rm *discord.Message
-			rm, err = s.SendMessageComplex(
-				discord.ChannelID(destCId), *data,
-			)
-	
+			rm, err = send(s, destCId, p, originalMsg, _binding, result)
 			if err != nil {
-				logger.Logger.Errorf("Failed to send message1: %s", err)
-				rm, err = s.SendMessageComplex(
-					discord.ChannelID(destCId), *data,
-				)
+				return
 			}
-	
-			_, err = s.SendMessage(discord.ChannelID(destCId), fmt.Sprintf("%s %s", originalMsg.Embeds[p.embedIndex].URL, locale.EXPLAIN_EMBED_RESOLVE))
-			if err != nil {
-				logger.Logger.Errorf("Failed to send message2: %s", err)
-			}
-
-			// if communityVotes > 3 {	
-			// 	_, err = s.SendMessage(discord.ChannelID(destCId), locale.HOT)
-			// 	if err != nil {
-			// 		logger.Logger.Errorf("Failed to send message3: %s", err)
-			// 	}
-			// }
 
 			err = _binding.Memorize(originalMsg.Embeds[p.embedIndex].URL, memory.Redirected)
 			if err != nil {
@@ -556,7 +549,17 @@ func prepareRedirectionMessage (originalMsg *discord.Message, nextPending *pendi
 
 // decideType only gives Original, Cover, Stream, None
 func decideType (pending *pendingEmbed, botMsg *discord.Message) (rType redirect.RedirectType, communityVotes int, err error) {
-	
+
+	if *globalFlags.novote {
+		if pending.isDup { // Skip duplicates
+			logger.Logger.Infof("  [%s-%d] DUPLICATE", pending.taskId, pending.embedIndex)
+			atomic.AddUint64(&statSession.SkippedDuplicate, 1)
+			return redirect.None, 0, nil
+		}
+
+		return pending.autoType, 0, nil
+	}
+
 	if pending.urlValidation != botMsg.ReferencedMessage.Embeds[pending.embedIndex].URL {
 		logger.Logger.Infof("  [!] Url modified, ABORT!")
 		return redirect.None, 0, nil
@@ -611,7 +614,7 @@ func decideType (pending *pendingEmbed, botMsg *discord.Message) (rType redirect
 				cS++
 			}
 		}
-	} else {
+	} else { // users voted
 		if pending.autoType == pending.preType {
 			switch pending.autoType {
 				case redirect.Original:
@@ -624,48 +627,57 @@ func decideType (pending *pendingEmbed, botMsg *discord.Message) (rType redirect
 		}
 	}
 
-	sum := cO + cC + cS
-
-	if sum == 0 || (cX > cO - 1 && cX > cC - 1 && cX > cS - 1) { // X has higher power
-		if pending.autoType == redirect.None {
-			logger.Logger.Infof("  [%s-%d] CANCEL   | o%d c%d s%d x%d ✔️", pending.taskId, pending.embedIndex, cO, cC, cS, cX)
-		} else {
-			logger.Logger.Infof("  [%s-%d] CANCEL   | o%d c%d s%d x%d ❓", pending.taskId, pending.embedIndex, cO, cC, cS, cX)
-		}
-		return redirect.None, communityVotes, nil
-	}
-
-	if cO > cC && cO > cS {
-		if pending.autoType == redirect.Original {
-			logger.Logger.Infof("  [%s-%d] ORIGINAL | o%d c%d s%d x%d ✔️", pending.taskId, pending.embedIndex, cO, cC, cS, cX)
-		} else {
-			logger.Logger.Infof("  [%s-%d] ORIGINAL | o%d c%d s%d x%d ❓", pending.taskId, pending.embedIndex, cO, cC, cS, cX)
-		}
-		rType = redirect.Original
-	}
-
-	if cS > cC && cS > cO {
-		if pending.autoType == redirect.Stream {
-			logger.Logger.Infof("  [%s-%d] STREAM   | o%d c%d s%d x%d ✔️", pending.taskId, pending.embedIndex, cO, cC, cS, cX)
-		} else {
-			logger.Logger.Infof("  [%s-%d] STREAM   | o%d c%d s%d x%d ❓", pending.taskId, pending.embedIndex, cO, cC, cS, cX)
-		}
-		rType = redirect.Stream
-	}
-
-	if cC > cS && cC > cO {
-		if pending.autoType == redirect.Cover {
-			logger.Logger.Infof("  [%s-%d] COVER    | o%d c%d s%d x%d ✔️", pending.taskId, pending.embedIndex, cO, cC, cS, cX)
-		} else {
-			logger.Logger.Infof("  [%s-%d] COVER    | o%d c%d s%d x%d ❓", pending.taskId, pending.embedIndex, cO, cC, cS, cX)
-		}
-		rType = redirect.Cover
-	}
+	rType = decideByFinalVote(cO, cC, cS, cX, pending)
 
 	return rType, communityVotes, nil
 }
 
+func decideByFinalVote (o, c, s, x int, pending *pendingEmbed) (rType redirect.RedirectType) {
+	sum := o + c + s
+
+	if sum == 0 || (x > o - 1 && x > c - 1 && x > s - 1) { // X has higher power
+		if pending.autoType == redirect.None {
+			logger.Logger.Infof("  [%s-%d] CANCEL   | o%d c%d s%d x%d ✔️", pending.taskId, pending.embedIndex, o, c, s, x)
+		} else {
+			logger.Logger.Infof("  [%s-%d] CANCEL   | o%d c%d s%d x%d ❓", pending.taskId, pending.embedIndex, o, c, s, x)
+		}
+		return redirect.None
+	}
+
+	if o > c && o > s {
+		if pending.autoType == redirect.Original {
+			logger.Logger.Infof("  [%s-%d] ORIGINAL | o%d c%d s%d x%d ✔️", pending.taskId, pending.embedIndex, o, c, s, x)
+		} else {
+			logger.Logger.Infof("  [%s-%d] ORIGINAL | o%d c%d s%d x%d ❓", pending.taskId, pending.embedIndex, o, c, s, x)
+		}
+		rType = redirect.Original
+	} else if s > c && s > o {
+		if pending.autoType == redirect.Stream {
+			logger.Logger.Infof("  [%s-%d] STREAM   | o%d c%d s%d x%d ✔️", pending.taskId, pending.embedIndex, o, c, s, x)
+		} else {
+			logger.Logger.Infof("  [%s-%d] STREAM   | o%d c%d s%d x%d ❓", pending.taskId, pending.embedIndex, o, c, s, x)
+		}
+		rType = redirect.Stream
+	} else if c > s && c > o {
+		if pending.autoType == redirect.Cover {
+			logger.Logger.Infof("  [%s-%d] COVER    | o%d c%d s%d x%d ✔️", pending.taskId, pending.embedIndex, o, c, s, x)
+		} else {
+			logger.Logger.Infof("  [%s-%d] COVER    | o%d c%d s%d x%d ❓", pending.taskId, pending.embedIndex, o, c, s, x)
+		}
+		rType = redirect.Cover
+	}
+
+	return
+}
+
 func validate (s *state.State, task *pendingEmbed) (botMsg *discord.Message, originalMsg *discord.Message, err error) {
+	if *globalFlags.novote {
+		if originalMsg, err = s.Message(task.cId, task.msgID); originalMsg == nil || err != nil {
+			logger.Logger.Errorf("[%s-%d] Original message inaccessible (error? %v", task.taskId, task.embedIndex, err)
+		}
+		return nil, originalMsg, err
+	}
+
 	botMsg, err = s.Message(task.cId, task.msgID)
 	if err != nil || botMsg == nil {
 		// Failed to access the bot message, deleted?
@@ -686,4 +698,38 @@ func validate (s *state.State, task *pendingEmbed) (botMsg *discord.Message, ori
 	}
 	
 	return botMsg, originalMsg, nil
+}
+
+func send (s *state.State, destCId uint64, p *pendingEmbed, originalMsg *discord.Message, binding *binding.ChannelBinding, result resultType) (msg *discord.Message, err error) {
+	
+	var data *api.SendMessageData
+	data, err = prepareRedirectionMessage(originalMsg, p, result)
+	if err != nil {
+		logger.Logger.Errorf("Failed to prepare redirection message!\n%v", err)
+		if originalMsg != nil {
+			err = binding.Memorize(originalMsg.Embeds[p.embedIndex].URL, memory.CancelledWithError)
+			if err != nil {
+				logger.Logger.Errorf("[%s-%d] Failed to memorize.", p.taskId, p.embedIndex)
+			}
+		}
+		return
+	}
+
+	msg, err = s.SendMessageComplex(
+		discord.ChannelID(destCId), *data,
+	)
+
+	if err != nil {
+		logger.Logger.Errorf("Failed to send message1: %s", err)
+		msg, err = s.SendMessageComplex(
+			discord.ChannelID(destCId), *data,
+		)
+	}
+
+	_, err = s.SendMessage(discord.ChannelID(destCId), fmt.Sprintf("%s %s", originalMsg.Embeds[p.embedIndex].URL, locale.EXPLAIN_EMBED_RESOLVE))
+	if err != nil {
+		logger.Logger.Errorf("Failed to send message2: %s", err)
+	}
+
+	return
 }

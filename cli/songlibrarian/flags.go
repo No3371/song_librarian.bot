@@ -17,6 +17,8 @@ type flags struct {
 	cooldown *time.Duration
 	memsize *int
 	printSqlStmt *bool
+	novote *bool
+	redirNone *bool
 }
 
 var globalFlags *flags
@@ -28,6 +30,8 @@ func resolveFlags () {
 	globalFlags.dev = flag.Bool("dev", false, "development mode")
 	globalFlags.printSqlStmt = flag.Bool("debug_sql", false, "")
 	globalFlags.debugRegex = flag.Bool("regex", false, "")
+	globalFlags.novote = flag.Bool("no_vote", true, "")
+	globalFlags.redirNone = flag.Bool("redir_none", false, "")
 	globalFlags.appid = flag.Int64("appid", 0, "discord app id")
 	globalFlags.token = flag.String("token", "", "discord bot token")
 	globalFlags.locale = flag.String("locale", "TW", "locale code")

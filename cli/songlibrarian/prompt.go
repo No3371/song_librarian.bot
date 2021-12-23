@@ -35,7 +35,6 @@ func startPromptLoop (s *state.State, closer chan struct{}) (promptDone chan str
 			}
 		}
 
-		
 		loop: for (true) {
 			select {
 			case <-closer:

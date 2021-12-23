@@ -275,6 +275,27 @@ func pendEmbed (s *state.State, task *mHandleSession, eIndex int, bId int) (err 
 	}
 
 	var hasSpoilerTag bool = len(task.spolierLines) > 0 // ! Embed links are resolved by Discord, the link may be different from the original shared one
+	
+	if *globalFlags.novote {
+		pendingEmbeds<-&pendingEmbed{
+			cId: task.msg.ChannelID,
+			msgID: task.mId,
+			embedIndex: eIndex,
+			urlValidation: task.msg.Embeds[eIndex].URL,
+			taskId: task.randomId,
+			bindingId: bId,
+			estimatedRTime: time.Now(),
+			autoType: guessType,
+			preType: preType,
+			isDup: redirectedRecently,
+			spoiler: hasSpoilerTag,
+		}
+		if err = _binding.Memorize(embed.URL, memory.Pended); err != nil {
+			logger.Logger.Errorf("  [%s] Failed to memorized(Pended): %v", task.randomId, err)
+		}
+		return nil
+	}
+
 
 	if hasSpoilerTag {
 		logger.Logger.Infof("  Spoiler tag detected." )
@@ -425,51 +446,22 @@ func pendEmbed (s *state.State, task *mHandleSession, eIndex int, bId int) (err 
 	if err = _binding.Memorize(embed.URL, memory.Pended); err != nil {
 		logger.Logger.Errorf("  [%s] Failed to memorized(Pended): %v", task.randomId, err)
 	}
+
 	botM, err := s.SendMessageComplex(task.msg.ChannelID, sendMessageData)
 	if err != nil {
 		logger.Logger.Errorf("[%s-%d] %v", task.randomId, eIndex, err)
 		return err
 	}
 
-	// var reaction string
-	// switch rType {
-	// case redirect.Original:
-	// 	reaction = reactionOriginal
-	// 	break
-	// case redirect.Cover:
-	// 	reaction = reactionCover
-	// 	break
-	// case redirect.Stream:
-	// 	reaction = reactionStream
-	// 	break
-	// case redirect.None:
-	// 	reaction = reactionNone
-	// 	break
-	// case redirect.Unknown:
-	// 	break
-	// }
-	
-	// logger.Logger.Infof("  Reacting...")
-	// err = s.React(botM.ChannelID, botM.ID, discord.APIEmoji(reactionOriginal))
-	// if err != nil {
-	// 	log.Printf("[Error] %s", fmt.Errorf("%w", err))
-	// 	return err
-	// }
-	// err = s.React(botM.ChannelID, botM.ID, discord.APIEmoji(reactionCover))
-	// if err != nil {
-	// 	log.Printf("[Error] %s", fmt.Errorf("%w", err))
-	// 	return err
-	// }
-	// err = s.React(botM.ChannelID, botM.ID, discord.APIEmoji(reactionStream))
-	// if err != nil {
-	// 	log.Printf("[Error] %s", fmt.Errorf("%w", err))
-	// 	return err
-	// }
-	// err = s.React(botM.ChannelID, botM.ID, discord.APIEmoji(reactionNone))
-	// if err != nil {
-	// 	log.Printf("[Error] %s", fmt.Errorf("%w", err))
-	// 	return err
-	// }
+
+	if hasSpoilerTag {
+		atomic.AddUint64(&statSession.PendedSpoilerFlag, 1)
+	}
+
+	if err = _binding.Memorize(embed.URL, memory.Pended); err != nil {
+		logger.Logger.Errorf("  [%s] Failed to memorized(Pended): %v", task.randomId, err)
+	}
+
 	pendingEmbeds<-&pendingEmbed{
 		cId: botM.ChannelID,
 		msgID: botM.ID,
@@ -483,15 +475,6 @@ func pendEmbed (s *state.State, task *mHandleSession, eIndex int, bId int) (err 
 		isDup: redirectedRecently,
 		spoiler: hasSpoilerTag,
 	}
-
-	if hasSpoilerTag {
-		atomic.AddUint64(&statSession.PendedSpoilerFlag, 1)
-	}
-
-	if err = _binding.Memorize(embed.URL, memory.Pended); err != nil {
-		logger.Logger.Errorf("  [%s] Failed to memorized(Pended): %v", task.randomId, err)
-	}
-
 	return nil
 }
 
@@ -537,6 +520,7 @@ func guess (task *mHandleSession, eIndex int) (redirectType redirect.RedirectTyp
 	}
 
 	var countO = 0
+	var countDO = 0
 	var countOPlus = 0
 	var countNotO = 0
 	var countDNotO = 0
@@ -562,7 +546,7 @@ func guess (task *mHandleSession, eIndex int) (redirectType redirect.RedirectTyp
 		logger.Logger.Errorf("Failed to match for Cover keywords: %v", err)
 		return redirect.Unknown, err
 	}
-
+	
 	countDC, err = countMatch(sb, "D.Cover", regexCoverDesc, embed.Description)
 	if err != nil {
 		logger.Logger.Errorf("Failed to match for D.Cover keywords: %v", err)
@@ -570,6 +554,15 @@ func guess (task *mHandleSession, eIndex int) (redirectType redirect.RedirectTyp
 	}
 	if countDC >= 2 {
 		countDC /= 2
+	}
+
+	countDO, err = countMatch(sb, "D.Original", regexOriginalDesc, embed.Description)
+	if err != nil {
+		logger.Logger.Errorf("Failed to match for D.Original keywords: %v", err)
+		return redirect.Unknown, err
+	}
+	if countDO >= 2 {
+		countDO /= 2
 	}
 
 	countNotC, err = countMatch(sb, "NotCover", regexBadForCover, embed.Title)
@@ -629,7 +622,7 @@ func guess (task *mHandleSession, eIndex int) (redirectType redirect.RedirectTyp
 		return redirect.Unknown, err
 	}
 
-	scoreO := countO + countOPlus - countNotO - countDNotO - countBadForAll
+	scoreO := countO + countDO + countOPlus - countNotO - countDNotO - countBadForAll
 	if scoreO < 0 {
 		scoreO = 0
 	}
@@ -644,9 +637,9 @@ func guess (task *mHandleSession, eIndex int) (redirectType redirect.RedirectTyp
 
 	defer func () {
 		logger.Logger.Infof("  [GUESS-%s-%d] %s", task.randomId, eIndex, sb.String())
-		logger.Logger.Infof("  [GUESS-%s-%d] %s | o%d=%d+%d-%d-%d c%d=%d+%d+%d-%d s%d=%d+%d-%d (ocs-%d)", task.randomId, eIndex,
+		logger.Logger.Infof("  [GUESS-%s-%d] %s | o%d=%d+%d+%d-%d-%d c%d=%d+%d+%d-%d s%d=%d+%d-%d (ocs-%d)", task.randomId, eIndex,
 			redirect.RedirectTypetoString(redirectType),
-			scoreO, countO, countOPlus, countNotO, countDNotO,
+			scoreO, countDO, countO, countOPlus, countNotO, countDNotO,
 			scoreC, countC, countCPlus, countDC, countNotC,
 			scoreS, countS, countSPlus, countNotS,
 			countBadForAll,

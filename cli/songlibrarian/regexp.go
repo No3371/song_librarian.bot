@@ -28,7 +28,7 @@ var regexBadForStream = regexp2.MustCompile(`debut|birthday stream|reaction`, re
 var regexBadForAll = regexp2.MustCompile(`REMIX枠|【(雑談|作業|apex|asmr)】|迷因|trailer|XFD`, regexp2.IgnoreCase | regexp2.Multiline)
 
 var regexCoverDesc = regexp2.MustCompile(`(本家|原唱|original:)([^\n\r]{1,4}\n?)http[^\n\r]+?(?![^\n\r]+?配信)[^\n\r]+?$|(本家|original:|原唱)([^\n\r]{1,4}\n?)http[^\n\r]+?(?![^\n\r]+?配信)[^\n\r]+?$|#歌ってみた`, regexp2.IgnoreCase | regexp2.Multiline)
-// var regexOriginalDesc = regexp2.MustCompile(`buy[^\n\r]{1,8}\n?http.+?$`, regexp2.IgnoreCase | regexp2.Multiline)
+var regexOriginalDesc = regexp2.MustCompile(`buy[^\n\r]{1,8}\n?http.+?$|#ボカロオリジナル曲|#オリジナル曲`, regexp2.IgnoreCase | regexp2.Multiline)
 
 var regexBadDescForOriginal = regexp2.MustCompile(`(本家|original)(.+?\n?)http.+?$|from original`, regexp2.IgnoreCase | regexp2.Multiline)
 
