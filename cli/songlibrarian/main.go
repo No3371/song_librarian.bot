@@ -305,6 +305,14 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 				}
 			}
 
+			if *globalFlags.novote && originalMsg == nil {
+				err = _binding.Memorize(originalMsg.Embeds[p.embedIndex].URL, memory.CancelledWithError)
+				if err != nil {
+					logger.Logger.Errorf("[%s-%d] Failed to memorize.", p.taskId, p.embedIndex)
+				}
+				return
+			}
+	
 			lastRedirectTime := _binding.GetLastTime(originalMsg.Embeds[p.embedIndex].URL, memory.Redirected)
 			if time.Since(lastRedirectTime) < time.Minute { // Handles user racing
 				logger.Logger.Infof("  [%s-%d] Seems like it just got redirected, abort.", p.taskId, p.embedIndex)
@@ -673,7 +681,7 @@ func decideByFinalVote (o, c, s, x int, pending *pendingEmbed) (rType redirect.R
 func validate (s *state.State, task *pendingEmbed) (botMsg *discord.Message, originalMsg *discord.Message, err error) {
 	if *globalFlags.novote {
 		if originalMsg, err = s.Message(task.cId, task.msgID); originalMsg == nil || err != nil {
-			logger.Logger.Errorf("[%s-%d] Original message inaccessible (error? %v", task.taskId, task.embedIndex, err)
+			logger.Logger.Infof("[%s-%d] ! Original message inaccessible (error? %v", task.taskId, task.embedIndex, err)
 		}
 		return nil, originalMsg, err
 	}
