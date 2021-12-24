@@ -306,10 +306,6 @@ func redirectorLoop (s *state.State, loopCloser chan struct{}) (loopDone chan st
 			}
 
 			if *globalFlags.novote && originalMsg == nil {
-				err = _binding.Memorize(originalMsg.Embeds[p.embedIndex].URL, memory.CancelledWithError)
-				if err != nil {
-					logger.Logger.Errorf("[%s-%d] Failed to memorize.", p.taskId, p.embedIndex)
-				}
 				return
 			}
 	
